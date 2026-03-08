@@ -6,6 +6,10 @@ export const COLLECTIONS = {
   PAYMENTS: "payments",
   NOTIFICATIONS: "notifications",
   REVIEWS: "reviews",
+  ROUTES: "routes",
+  AVAILABILITY: "availability",
+  FEE_PAYMENTS: "feePayments",
+  CHALLANS: "challans",
 } as const;
 
 export type CollectionKey = keyof typeof COLLECTIONS;

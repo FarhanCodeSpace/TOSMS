@@ -6,8 +6,8 @@ import {
   DriverTabParamList,
   DriverHomeStackParamList,
   DriverActiveRideStackParamList,
-  DriverEarningsStackParamList,
   DriverProfileStackParamList,
+  DriverMyRouteStackParamList,
 } from "./types";
 import {
   DriverHomeScreen,
@@ -15,19 +15,20 @@ import {
   ActiveRideScreen,
   PassengersScreen,
   RideSummaryScreen,
-  EarningsScreen,
   DriverProfileScreen,
-} from "@screens/Driver/DriverScreens";
+  DriverAvailabilityScreen,
+  DriverMyRouteScreen,
+} from "@screens/Driver";
 import { COLORS } from "@constants/theme";
 
 const Tab = createBottomTabNavigator<DriverTabParamList>();
 const HomeStack = createStackNavigator<DriverHomeStackParamList>();
 const ActiveRideStack = createStackNavigator<DriverActiveRideStackParamList>();
-const EarningsStack = createStackNavigator<DriverEarningsStackParamList>();
 const ProfileStack = createStackNavigator<DriverProfileStackParamList>();
+const MyRouteStack = createStackNavigator<DriverMyRouteStackParamList>();
 
 const HomeStackNavigator = () => (
-  <HomeStack.Navigator>
+  <HomeStack.Navigator screenOptions={{ headerShown: false }}>
     <HomeStack.Screen
       name="DriverHome"
       component={DriverHomeScreen}
@@ -38,11 +39,26 @@ const HomeStackNavigator = () => (
       component={CreateRideScreen}
       options={{ title: "Create Ride" }}
     />
+    <HomeStack.Screen
+      name="DriverAvailability"
+      component={DriverAvailabilityScreen}
+      options={{ title: "Availability" }}
+    />
   </HomeStack.Navigator>
 );
 
+const MyRouteStackNavigator = () => (
+  <MyRouteStack.Navigator screenOptions={{ headerShown: false }}>
+    <MyRouteStack.Screen
+      name="DriverMyRoute"
+      component={DriverMyRouteScreen}
+      options={{ title: "My Route" }}
+    />
+  </MyRouteStack.Navigator>
+);
+
 const ActiveRideStackNavigator = () => (
-  <ActiveRideStack.Navigator>
+  <ActiveRideStack.Navigator screenOptions={{ headerShown: false }}>
     <ActiveRideStack.Screen
       name="ActiveRide"
       component={ActiveRideScreen}
@@ -61,18 +77,8 @@ const ActiveRideStackNavigator = () => (
   </ActiveRideStack.Navigator>
 );
 
-const EarningsStackNavigator = () => (
-  <EarningsStack.Navigator>
-    <EarningsStack.Screen
-      name="Earnings"
-      component={EarningsScreen}
-      options={{ title: "Earnings" }}
-    />
-  </EarningsStack.Navigator>
-);
-
 const ProfileStackNavigator = () => (
-  <ProfileStack.Navigator>
+  <ProfileStack.Navigator screenOptions={{ headerShown: false }}>
     <ProfileStack.Screen
       name="DriverProfile"
       component={DriverProfileScreen}
@@ -91,8 +97,8 @@ export const DriverNavigator = () => {
         tabBarIcon: ({ color, size }) => {
           let iconName = "home";
           if (route.name === "HomeTab") iconName = "home";
+          else if (route.name === "MyRouteTab") iconName = "map-marker";
           else if (route.name === "ActiveRideTab") iconName = "play-circle";
-          else if (route.name === "EarningsTab") iconName = "cash";
           else if (route.name === "ProfileTab") iconName = "account";
           return <Icon name={iconName} size={size} color={color} />;
         },
@@ -104,14 +110,14 @@ export const DriverNavigator = () => {
         options={{ tabBarLabel: "Home" }}
       />
       <Tab.Screen
+        name="MyRouteTab"
+        component={MyRouteStackNavigator}
+        options={{ tabBarLabel: "My Route" }}
+      />
+      <Tab.Screen
         name="ActiveRideTab"
         component={ActiveRideStackNavigator}
         options={{ tabBarLabel: "Active Ride" }}
-      />
-      <Tab.Screen
-        name="EarningsTab"
-        component={EarningsStackNavigator}
-        options={{ tabBarLabel: "Earnings" }}
       />
       <Tab.Screen
         name="ProfileTab"

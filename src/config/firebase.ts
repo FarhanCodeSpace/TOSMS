@@ -1,7 +1,12 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
+import { 
+  initializeAuth, 
+  // @ts-ignore - getReactNativePersistence is only available in the RN-specific bundle of firebase/auth
+  getReactNativePersistence 
+} from 'firebase/auth';
+import { initializeFirestore, memoryLocalCache } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -15,24 +20,16 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Services
-const auth = getAuth(app);
-const db = getFirestore(app);
-const storage = getStorage(app);
+// Initialize Auth with AsyncStorage persistence (prevents session loss on restart)
+const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(ReactNativeAsyncStorage),
+});
 
-// Enable Offline Persistence
-try {
-  enableIndexedDbPersistence(db).catch((err) => {
-    if (err.code === 'failed-precondition') {
-      // Multiple tabs open, persistence can only be enabled in one tab at a a time.
-      console.warn('Firestore persistence failed: Multiple tabs open');
-    } else if (err.code === 'unimplemented') {
-      // The current browser doesn't support all of the features required to enable persistence
-      console.warn('Firestore persistence failed: Browser not supported');
-    }
-  });
-} catch (error) {
-  console.error('Error enabling Firestore persistence:', error);
-}
+// Initialize Firestore with memory cache (replaces deprecated enableIndexedDbPersistence)
+const db = initializeFirestore(app, {
+  localCache: memoryLocalCache(),
+});
+
+const storage = getStorage(app);
 
 export { app, auth, db, storage };

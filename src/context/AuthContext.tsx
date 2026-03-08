@@ -78,9 +78,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
           const userData = userDoc.data() as User;
           setCurrentUser(userData);
           await saveUserToStorage(userData);
+        } else {
+          console.warn(`User document not found for UID: ${uid}`);
+          // If no doc exists, we should probably sign out or handle as incomplete profile
+          // Setting to null for now ensures we don't get stuck in a partial state
+          setCurrentUser(null);
+          await saveUserToStorage(null);
         }
       } catch (error) {
         console.error("Error fetching user document:", error);
+        throw error; // Rethrow to allow caller to handle
       }
     },
     [saveUserToStorage],
@@ -93,8 +100,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     const unsubscribe = onAuthStateChanged(
       auth,
       async (firebaseUser: FirebaseUser | null) => {
+        setIsLoading(true);
         if (firebaseUser) {
-          await fetchUserDoc(firebaseUser.uid);
+          try {
+            await fetchUserDoc(firebaseUser.uid);
+          } catch (error) {
+            console.error("Auth state change error:", error);
+            setCurrentUser(null);
+          }
         } else {
           setCurrentUser(null);
           await saveUserToStorage(null);

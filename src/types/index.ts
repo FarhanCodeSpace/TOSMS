@@ -10,11 +10,12 @@ export interface Location {
 }
 
 /**
- * Represents a stop along a ride route.
+ * Represents a stop along a route.
  */
 export interface RideStop {
   stopName: string;
   order: number;
+  coordinates?: { latitude: number; longitude: number };
 }
 
 /**
@@ -33,6 +34,10 @@ export interface User {
   createdAt: Timestamp;
   status: "active" | "suspended";
 
+  // Student-specific fields (assigned by admin)
+  routeId?: string;
+  pickupStop?: string;
+
   // Driver specific extra fields
   vehicleType?: "van" | "bus" | "coaster";
   vehiclePlate?: string;
@@ -45,10 +50,86 @@ export interface User {
 }
 
 /**
- * Represents a Ride created by a driver.
+ * Represents a corporate transport Route managed by admin.
+ */
+export interface Route {
+  routeId: string;
+  routeName: string;
+  description?: string;
+  stops: {
+    stopName: string;
+    order: number;
+    coordinates: { latitude: number; longitude: number };
+  }[];
+  assignedDriverId?: string;
+  assignedDriverName?: string;
+  studentIds: string[];
+  departureTime: string;
+  returnTime?: string;
+  feeAmount: number;
+  isActive: boolean;
+  createdAt: Timestamp;
+}
+
+/**
+ * Represents a daily availability record for student or driver.
+ */
+export interface Availability {
+  availabilityId?: string;
+  userId: string;
+  userName: string;
+  routeId: string;
+  date: string; // 'YYYY-MM-DD'
+  isAvailable: boolean;
+  note?: string;
+  role: "student" | "driver";
+  vehicleAvailable?: boolean; // Driver-only
+  markedAt: Timestamp;
+}
+
+/**
+ * Represents a fee payment record for a student.
+ */
+export interface FeePayment {
+  paymentId?: string;
+  studentId: string;
+  studentName: string;
+  routeId: string;
+  month: string; // 'YYYY-MM'
+  amount: number;
+  paymentMethod: "bank_challan" | "easypaisa" | "jazzcash";
+  paymentStatus: "pending" | "submitted" | "verified";
+  challanNumber?: string;
+  transactionId?: string;
+  submittedAt?: Timestamp;
+  verifiedAt?: Timestamp;
+  receiptImageUrl?: string;
+}
+
+/**
+ * Represents a payment challan generated for a student.
+ */
+export interface Challan {
+  challanId?: string;
+  studentId: string;
+  studentName: string;
+  studentPhone: string;
+  routeId: string;
+  routeName: string;
+  month: string; // 'YYYY-MM'
+  amount: number;
+  challanNumber: string;
+  status: "generated" | "deposited" | "verified";
+  generatedAt: Timestamp;
+  receiptImageUrl?: string;
+}
+
+/**
+ * Represents a Ride created by a driver on a specific date.
  */
 export interface Ride {
   rideId: string;
+  routeId?: string;
   driverId: string;
   driverName: string;
   driverPhone: string;
@@ -60,10 +141,12 @@ export interface Ride {
   endLocation: Location;
   stops: RideStop[];
   departureTime: Timestamp;
+  date?: string; // 'YYYY-MM-DD'
   totalSeats: number;
   availableSeats: number;
   farePerSeat: number;
   passengerIds: string[];
+  completedStudentIds?: string[];
   seatMap: Record<
     number,
     {
@@ -85,6 +168,7 @@ export interface Booking {
   studentName: string;
   studentPhone: string;
   rideId: string;
+  routeName?: string;
   driverId: string;
   seatNumber: number;
   pickupStop: string;
@@ -107,3 +191,4 @@ export interface LiveLocation {
   speed: number;
   updatedAt: Timestamp;
 }
+

@@ -40,3 +40,10 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Firebase
+serviceAccountKey.json
+google-services.json
+
+# Scripts
+scripts/seedFirestore.js

@@ -35,7 +35,13 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
 
     try {
       await login(email, password);
+      // Wait a bit to let the navigation happen through the RootNavigator
+      // If we are still here after 5 seconds, something might be wrong
+      setTimeout(() => {
+        setIsLoading(false);
+      }, 5000);
     } catch (err: any) {
+      setIsLoading(false);
       console.error("Login error:", err.code);
       switch (err.code) {
         case "auth/invalid-email":
@@ -56,8 +62,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
         default:
           setError("An unexpected error occurred. Please try again.");
       }
-    } finally {
-      setIsLoading(false);
     }
   };
 

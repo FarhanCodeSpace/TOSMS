@@ -7,57 +7,79 @@ import {
   StudentHomeStackParamList,
   StudentRidesStackParamList,
   StudentProfileStackParamList,
+  StudentMyRouteStackParamList,
 } from "./types";
 import {
   StudentHomeScreen,
-  RideDetailScreen,
-  SeatSelectionScreen,
-  PaymentScreen,
-  BookingConfirmScreen,
   RideHistoryScreen,
   TrackRideScreen,
   StudentProfileScreen,
   EditProfileScreen,
 } from "@screens/Student/StudentScreens";
+import {
+  MyRouteScreen,
+  AvailabilityScreen,
+  StudentAvailabilityScreen,
+} from "@screens/Student/StudentScreens";
+import {
+  FeePaymentScreen,
+  ChallanViewScreen,
+} from "@screens/Student/StudentPlaceholders";
 import { COLORS } from "@constants/theme";
 
 const Tab = createBottomTabNavigator<StudentTabParamList>();
 const HomeStack = createStackNavigator<StudentHomeStackParamList>();
 const RidesStack = createStackNavigator<StudentRidesStackParamList>();
 const ProfileStack = createStackNavigator<StudentProfileStackParamList>();
+const MyRouteStack = createStackNavigator<StudentMyRouteStackParamList>();
 
 const HomeStackNavigator = () => (
-  <HomeStack.Navigator>
+  <HomeStack.Navigator screenOptions={{ headerShown: false }}>
     <HomeStack.Screen
       name="StudentHome"
       component={StudentHomeScreen}
-      options={{ title: "Home" }}
+      options={{ headerShown: false }}
     />
     <HomeStack.Screen
-      name="RideDetail"
-      component={RideDetailScreen}
-      options={{ title: "Ride Details" }}
+      name="FeePayment"
+      component={FeePaymentScreen}
+      options={{ title: "Pay Fee" }}
     />
     <HomeStack.Screen
-      name="SeatSelection"
-      component={SeatSelectionScreen}
-      options={{ title: "Select Seat" }}
+      name="ChallanView"
+      component={ChallanViewScreen}
+      options={{ title: "View Challan" }}
     />
     <HomeStack.Screen
-      name="Payment"
-      component={PaymentScreen}
-      options={{ title: "Payment" }}
+      name="Availability"
+      component={AvailabilityScreen}
+      options={{ title: "Availability" }}
     />
     <HomeStack.Screen
-      name="BookingConfirm"
-      component={BookingConfirmScreen}
-      options={{ title: "Booking Confirmed" }}
+      name="StudentAvailability"
+      component={StudentAvailabilityScreen}
+      options={{ headerShown: false }}
+    />
+    <HomeStack.Screen
+      name="TrackRide"
+      component={TrackRideScreen}
+      options={{ title: "Track Ride" }}
     />
   </HomeStack.Navigator>
 );
 
+const MyRouteStackNavigator = () => (
+  <MyRouteStack.Navigator screenOptions={{ headerShown: false }}>
+    <MyRouteStack.Screen
+      name="MyRoute"
+      component={MyRouteScreen}
+      options={{ title: "My Route" }}
+    />
+  </MyRouteStack.Navigator>
+);
+
 const RidesStackNavigator = () => (
-  <RidesStack.Navigator>
+  <RidesStack.Navigator screenOptions={{ headerShown: false }}>
     <RidesStack.Screen
       name="RideHistory"
       component={RideHistoryScreen}
@@ -72,7 +94,7 @@ const RidesStackNavigator = () => (
 );
 
 const ProfileStackNavigator = () => (
-  <ProfileStack.Navigator>
+  <ProfileStack.Navigator screenOptions={{ headerShown: false }}>
     <ProfileStack.Screen
       name="StudentProfile"
       component={StudentProfileScreen}
@@ -96,7 +118,8 @@ export const StudentNavigator = () => {
         tabBarIcon: ({ color, size }) => {
           let iconName = "home";
           if (route.name === "HomeTab") iconName = "home";
-          else if (route.name === "MyRidesTab") iconName = "car";
+          else if (route.name === "MyRouteTab") iconName = "map-marker";
+          else if (route.name === "MyRidesTab") iconName = "history";
           else if (route.name === "ProfileTab") iconName = "account";
           return <Icon name={iconName} size={size} color={color} />;
         },
@@ -108,9 +131,14 @@ export const StudentNavigator = () => {
         options={{ tabBarLabel: "Home" }}
       />
       <Tab.Screen
+        name="MyRouteTab"
+        component={MyRouteStackNavigator}
+        options={{ tabBarLabel: "My Route" }}
+      />
+      <Tab.Screen
         name="MyRidesTab"
         component={RidesStackNavigator}
-        options={{ tabBarLabel: "My Rides" }}
+        options={{ tabBarLabel: "History" }}
       />
       <Tab.Screen
         name="ProfileTab"

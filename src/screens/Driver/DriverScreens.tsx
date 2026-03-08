@@ -9,10 +9,6 @@ const PlaceholderScreen = ({ name }: { name: string }) => (
 
 export const DriverHomeScreen = () => <PlaceholderScreen name="Driver Home" />;
 export const CreateRideScreen = () => <PlaceholderScreen name="Create Ride" />;
-export const ActiveRideScreen = () => <PlaceholderScreen name="Active Ride" />;
-export const PassengersScreen = () => <PlaceholderScreen name="Passengers" />;
-export const RideSummaryScreen = () => <PlaceholderScreen name="Ride Summary" />;
-export const EarningsScreen = () => <PlaceholderScreen name="Earnings" />;
 export const DriverProfileScreen = () => <PlaceholderScreen name="Driver Profile" />;
 export const DriverPendingScreen = () => <PlaceholderScreen name="Driver Pending Approval" />;
 

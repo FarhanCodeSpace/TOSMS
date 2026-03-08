@@ -15,12 +15,11 @@ import {
   HelperText,
 } from "react-native-paper";
 import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system/legacy";
-import { ref, uploadString, getDownloadURL } from "firebase/storage";
 import { doc, updateDoc } from "firebase/firestore";
-import { storage, db, auth } from "@config/firebase";
+import { db } from "@config/firebase";
 import { COLLECTIONS } from "@config/firebaseCollections";
 import { useAuth } from "@hooks/useAuth";
+import { uploadFileToStorage } from "@utils/imageUtils";
 import { COLORS, SPACING } from "@constants/theme";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { AuthStackParamList } from "@navigation/types";
@@ -98,14 +97,8 @@ const DriverProfileSetupScreen: React.FC<DriverProfileSetupScreenProps> = ({
     try {
       let profileImageUrl = null;
       if (profileImage) {
-        const base64 = await FileSystem.readAsStringAsync(profileImage, {
-          encoding: "base64",
-        });
-        const imageRef = ref(storage, `profileImages/${currentUser?.uid}`);
-        await uploadString(imageRef, base64, "base64", {
-          contentType: "image/jpeg",
-        });
-        profileImageUrl = await getDownloadURL(imageRef);
+        const storagePath = `profileImages/${currentUser?.uid}`;
+        profileImageUrl = await uploadFileToStorage(profileImage, storagePath);
       }
       const driverData = {
         profileImageUrl,
@@ -114,7 +107,8 @@ const DriverProfileSetupScreen: React.FC<DriverProfileSetupScreenProps> = ({
         vehiclePlate: plateNumber,
         vehicleCapacity: parseInt(capacity),
         profileComplete: true,
-        approved: false,
+        // Auto-approve for development/testing purposes
+        approved: true,
       };
 
       if (currentUser?.uid) {
@@ -127,7 +121,7 @@ const DriverProfileSetupScreen: React.FC<DriverProfileSetupScreenProps> = ({
       }
     } catch (err: any) {
       console.error("Driver setup error:", err);
-      setError("Failed to update profile. Please try again.");
+      setError(`Failed to update profile: ${err.message || "Unknown error"}`);
     } finally {
       setIsLoading(false);
     }

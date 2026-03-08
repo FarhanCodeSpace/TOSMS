@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { TextInput, Button, Text, Card, IconButton, HelperText, useTheme } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import MapView, { Marker, MarkerDragStartEndEvent } from 'react-native-maps';
 import * as Location from 'expo-location';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
@@ -39,6 +40,11 @@ const CreateRideScreen: React.FC<CreateRideScreenProps> = ({ navigation }) => {
 
   const handleReverseGeocode = async (lat: number, lng: number, type: 'start' | 'end') => {
     try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Location permission is required to find addresses.');
+        return;
+      }
       const result = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
       if (result.length > 0) {
         const address = `${result[0].name || ''}, ${result[0].city || ''}`;
@@ -221,6 +227,14 @@ const CreateRideScreen: React.FC<CreateRideScreenProps> = ({ navigation }) => {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
+      {/* ── Floating Back Button ── */}
+      <TouchableOpacity 
+        style={styles.backButton} 
+        onPress={() => navigation.goBack()}
+      >
+        <MaterialCommunityIcons name="chevron-left" size={28} color={COLORS.text} />
+      </TouchableOpacity>
+
       <View style={styles.stepper}>
         <View style={styles.stepIndicator}>
           {[1, 2, 3].map(s => (
@@ -238,7 +252,21 @@ const CreateRideScreen: React.FC<CreateRideScreenProps> = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { padding: SPACING.md, backgroundColor: COLORS.background },
+  container: { padding: SPACING.md, paddingTop: 60, backgroundColor: COLORS.background },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
   stepper: { alignItems: 'center', marginBottom: SPACING.lg },
   stepIndicator: { flexDirection: 'row', marginBottom: 8 },
   stepDot: { width: 40, height: 4, borderRadius: 2, marginHorizontal: 4 },

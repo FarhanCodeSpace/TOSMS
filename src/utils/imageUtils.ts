@@ -20,25 +20,27 @@ export const uploadFileToStorage = async (
       encoding: FileSystem.EncodingType.Base64,
     });
 
-    // 2. Build filename from storagePath
-    const fileName = storagePath.replace(/\//g, "__") + ".jpg";
+    // 2. Build filename and folder from storagePath
+    // storagePath example: "profileImages/userId" or "receipts/userId/month-receipt"
+    const pathParts = storagePath.split("/");
+    const fileName = pathParts.pop() + ".jpg";
+    const folder = "/" + pathParts.join("/");
 
     // 3. ImageKit Basic auth: base64(privateKey + ":")
     const authValue = "Basic " + btoa(IMAGEKIT_PRIVATE_KEY + ":");
 
-    // 4. Build FormData — React Native supports text fields in FormData just fine
+    // 4. Build FormData
     const formData = new FormData();
-    formData.append("file", base64);         // raw base64 string (no data: prefix)
+    formData.append("file", base64);
     formData.append("fileName", fileName);
-    formData.append("folder", "/profileImages");
-    formData.append("useUniqueFileName", "false");
+    formData.append("folder", folder || "/general");
+    formData.append("useUniqueFileName", "true");
 
     // 5. POST to ImageKit Upload API
     const response = await fetch("https://upload.imagekit.io/api/v1/files/upload", {
       method: "POST",
       headers: {
         Authorization: authValue,
-        // Do NOT manually set Content-Type — let fetch set it with boundary for multipart
       },
       body: formData,
     });

@@ -24,7 +24,9 @@ import {
 import {
   FeePaymentScreen,
   ChallanViewScreen,
-} from "@screens/Student/StudentPlaceholders";
+  ChallanDepositScreen,
+  PaymentHistoryScreen
+} from "@screens/Student/StudentScreens";
 import { COLORS } from "@constants/theme";
 
 const Tab = createBottomTabNavigator<StudentTabParamList>();
@@ -49,6 +51,16 @@ const HomeStackNavigator = () => (
       name="ChallanView"
       component={ChallanViewScreen}
       options={{ title: "View Challan" }}
+    />
+    <HomeStack.Screen
+      name="ChallanDeposit"
+      component={ChallanDepositScreen}
+      options={{ title: "Submit Deposit" }}
+    />
+    <HomeStack.Screen
+      name="PaymentHistory"
+      component={PaymentHistoryScreen}
+      options={{ title: "Payment History" }}
     />
     <HomeStack.Screen
       name="Availability"

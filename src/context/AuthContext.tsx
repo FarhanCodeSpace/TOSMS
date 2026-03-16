@@ -85,7 +85,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
           setCurrentUser(null);
           await saveUserToStorage(null);
         }
-      } catch (error) {
+      } catch (error: any) {
+        if (error.code === 'failed-precondition' || error.message?.includes('offline')) {
+          console.warn("Firestore is offline, using cached data if available.");
+          // In offline mode, Firestore getDoc might still work if persistence is on
+          // but we'll log it specifically for the user
+        }
         console.error("Error fetching user document:", error);
         throw error; // Rethrow to allow caller to handle
       }

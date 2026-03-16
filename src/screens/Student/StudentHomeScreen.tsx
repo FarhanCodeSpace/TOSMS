@@ -27,7 +27,8 @@ const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({ navigation }) => 
   const [refreshing, setRefreshing] = useState(false);
   const [myRoute, setMyRoute] = useState<any>(null);
   const [todayRide, setTodayRide] = useState<any>(null);
-  const [feeStatus, setFeeStatus] = useState<any>(null);
+  const [feeStatus, setFeeStatus] = useState<'pending' | 'submitted' | 'verified'>('pending');
+  const [feePayment, setFeePayment] = useState<any>(null);
   const [availabilityDoc, setAvailabilityDoc] = useState<any>(null);
   const [weekAvailability, setWeekAvailability] = useState<Record<string, any>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -72,13 +73,18 @@ const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({ navigation }) => 
     const feeQuery = query(
       collection(db, COLLECTIONS.FEE_PAYMENTS),
       where('studentId', '==', currentUser.uid),
-      where('month', '==', currentMonth)
+      where('month', '==', currentMonth),
+      limit(1)
     );
+    
     const unsubscribeFee = onSnapshot(feeQuery, (snapshot) => {
       if (!snapshot.empty) {
-        setFeeStatus(snapshot.docs[0].data());
+        const paymentData = snapshot.docs[0].data();
+        setFeeStatus(paymentData.paymentStatus); // 'verified', 'submitted', or 'pending'
+        setFeePayment(paymentData);
       } else {
-        setFeeStatus(null);
+        setFeeStatus('pending');
+        setFeePayment(null);
       }
     });
 
@@ -178,8 +184,11 @@ const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({ navigation }) => 
                 </View>
                 <View style={styles.divider} />
                 <View style={styles.statsCol}>
-                    <Text style={[styles.statsValue, { color: feeStatus?.paymentStatus === 'verified' ? '#16A34A' : '#DC2626' }]}>
-                        {feeStatus?.paymentStatus === 'verified' ? 'Paid' : 'Due'}
+                    <Text style={[
+                        styles.statsValue, 
+                        { color: feeStatus === 'verified' ? '#16A34A' : (feeStatus === 'submitted' ? '#F59E0B' : '#DC2626') }
+                    ]}>
+                        {feeStatus === 'verified' ? 'Paid' : (feeStatus === 'submitted' ? 'Review' : 'Due')}
                     </Text>
                     <Text style={styles.statsLabel}>Fee</Text>
                 </View>
@@ -243,26 +252,26 @@ const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({ navigation }) => 
                 <TouchableOpacity 
                     style={[
                         styles.miniCard, 
-                        feeStatus?.paymentStatus === 'verified' ? styles.availableCard : 
-                        (feeStatus?.paymentStatus === 'submitted' ? styles.notMarkedCard : styles.unavailableCard)
+                        feeStatus === 'verified' ? styles.availableCard : 
+                        (feeStatus === 'submitted' ? styles.notMarkedCard : styles.unavailableCard)
                     ]} 
                     onPress={() => navigation.navigate('FeePayment' as any)}
                 >
                     <View style={styles.miniCardHeader}>
                         <MaterialCommunityIcons 
-                            name={feeStatus?.paymentStatus === 'verified' ? "credit-card-check" : (feeStatus?.paymentStatus === 'submitted' ? "clock-outline" : "credit-card-remove")} 
+                            name={feeStatus === 'verified' ? "credit-card-check" : (feeStatus === 'submitted' ? "clock-outline" : "credit-card-remove")} 
                             size={16} 
-                            color={feeStatus?.paymentStatus === 'verified' ? "#16A34A" : (feeStatus?.paymentStatus === 'submitted' ? "#F59E0B" : "#DC2626")} 
+                            color={feeStatus === 'verified' ? "#16A34A" : (feeStatus === 'submitted' ? "#F59E0B" : "#DC2626")} 
                         />
-                        <Text style={[styles.miniCardTitle, { color: feeStatus?.paymentStatus === 'verified' ? "#16A34A" : (feeStatus?.paymentStatus === 'submitted' ? "#92400E" : "#DC2626") }]}>
+                        <Text style={[styles.miniCardTitle, { color: feeStatus === 'verified' ? "#16A34A" : (feeStatus === 'submitted' ? "#92400E" : "#DC2626") }]}>
                             Monthly Fee
                         </Text>
                     </View>
-                    <Text style={[styles.miniCardStatus, { color: feeStatus?.paymentStatus === 'verified' ? "#16A34A" : (feeStatus?.paymentStatus === 'submitted' ? "#92400E" : "#DC2626"), marginTop: 6 }]}>
-                        {feeStatus?.paymentStatus === 'verified' ? 'Paid ✓' : (feeStatus?.paymentStatus === 'submitted' ? 'Under Review' : 'Fee Due')}
+                    <Text style={[styles.miniCardStatus, { color: feeStatus === 'verified' ? "#16A34A" : (feeStatus === 'submitted' ? "#92400E" : "#DC2626"), marginTop: 6 }]}>
+                        {feeStatus === 'verified' ? 'Paid ✓' : (feeStatus === 'submitted' ? 'Under Review' : 'Fee Due')}
                     </Text>
                     <Text style={styles.miniCardSub}>
-                        {feeStatus?.paymentStatus === 'verified' ? format(new Date(), 'MMMM') : (feeStatus?.paymentStatus === 'submitted' ? 'Admin verifying' : 'Tap to pay')}
+                        {feeStatus === 'verified' ? format(new Date(), 'MMMM') : (feeStatus === 'submitted' ? 'Admin verifying' : 'Tap to pay')}
                     </Text>
                 </TouchableOpacity>
             </ScrollView>

@@ -10,10 +10,10 @@ import {
 } from 'react-native';
 import { Text, Button, TextInput } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
-import { db, storage } from '@config/firebase';
+import { db } from '@config/firebase';
 import { COLLECTIONS } from '@config/firebaseCollections';
 import { doc, updateDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { uploadFileToStorage } from '@utils/imageUtils';
 import { useAuth } from '@hooks/useAuth';
 import { COLORS, SPACING, FONTS } from '@constants/theme';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -61,11 +61,8 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation
       let profileImageUrl = currentUser.profileImageUrl;
 
       if (newImageUri) {
-        const storageRef = ref(storage, `profileImages/${currentUser.uid}`);
-        const response = await fetch(newImageUri);
-        const blob = await response.blob();
-        await uploadBytes(storageRef, blob);
-        profileImageUrl = await getDownloadURL(storageRef);
+        const storagePath = `profileImages/${currentUser.uid}`;
+        profileImageUrl = await uploadFileToStorage(newImageUri, storagePath);
       }
 
       const updatedData = { fullName, phone, profileImageUrl };

@@ -1,10 +1,14 @@
 import { initializeApp } from 'firebase/app';
-import { 
-  initializeAuth, 
-  // @ts-ignore - getReactNativePersistence is only available in the RN-specific bundle of firebase/auth
-  getReactNativePersistence 
+import {
+  initializeAuth,
+  // @ts-ignore
+  getReactNativePersistence
 } from 'firebase/auth';
-import { initializeFirestore, memoryLocalCache } from 'firebase/firestore';
+import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentSingleTabManager
+} from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -17,17 +21,23 @@ const firebaseConfig = {
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Auth with AsyncStorage persistence (prevents session loss on restart)
 const auth = initializeAuth(app, {
   persistence: getReactNativePersistence(ReactNativeAsyncStorage),
 });
 
-// Initialize Firestore with memory cache (replaces deprecated enableIndexedDbPersistence)
+// persistentLocalCache stores data on device
+// so app loads instantly from cache even with weak/no signal
+// then syncs with Firebase when connection improves
 const db = initializeFirestore(app, {
-  localCache: memoryLocalCache(),
+  localCache: persistentLocalCache({
+    tabManager: persistentSingleTabManager({
+      forceOwnership: true
+    })
+  }),
+  experimentalAutoDetectLongPolling: true, // Auto-detect when to use long polling
+  ignoreUndefinedProperties: true,       // Good practice for Firestore
 });
 
 const storage = getStorage(app);

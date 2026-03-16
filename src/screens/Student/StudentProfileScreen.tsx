@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Alert, Image } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert, Image, TouchableOpacity } from 'react-native';
 import { Text, Button, Card } from 'react-native-paper';
+import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { db } from '@config/firebase';
 import { COLLECTIONS } from '@config/firebaseCollections';
 import { collection, query, where, getDocs } from 'firebase/firestore';
@@ -91,6 +92,22 @@ export const StudentProfileScreen: React.FC<StudentProfileScreenProps> = ({ navi
         </View>
       </View>
 
+      {/* Menu Options */}
+      <View style={styles.menuSection}>
+        <TouchableOpacity 
+          style={styles.menuItem} 
+          onPress={() => (navigation as any).navigate('PaymentHistory')}
+        >
+          <View style={styles.menuItemLeft}>
+            <View style={styles.menuIconBox}>
+              <Icon name="history" size={24} color={COLORS.primary} />
+            </View>
+            <Text style={styles.menuItemText}>Payment History</Text>
+          </View>
+          <Icon name="chevron-right" size={24} color="#D1D5DB" />
+        </TouchableOpacity>
+      </View>
+
       {/* Action Buttons */}
       <View style={styles.actions}>
         <Button
@@ -152,7 +169,12 @@ const styles = StyleSheet.create({
   statBox: { flex: 1, padding: SPACING.md, alignItems: 'center' },
   statValue: { fontSize: FONTS.xxl, fontWeight: 'bold', color: COLORS.primary },
   statLabel: { color: COLORS.textSecondary, fontSize: FONTS.sm, marginTop: 4 },
-  actions: { padding: SPACING.md, gap: SPACING.md },
+  menuSection: { marginTop: SPACING.lg, marginHorizontal: SPACING.md, backgroundColor: COLORS.surface, borderRadius: 12, elevation: 1 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: SPACING.md },
+  menuItemLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  menuIconBox: { width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.background, alignItems: 'center', justifyContent: 'center' },
+  menuItemText: { fontSize: FONTS.md, fontWeight: '600', color: COLORS.text },
+  actions: { padding: SPACING.md, gap: SPACING.md, marginTop: SPACING.sm },
   actionBtn: { borderRadius: 8 },
 });
 

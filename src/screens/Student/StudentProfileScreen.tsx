@@ -96,7 +96,7 @@ export const StudentProfileScreen: React.FC<StudentProfileScreenProps> = ({ navi
       <View style={styles.menuSection}>
         <TouchableOpacity 
           style={styles.menuItem} 
-          onPress={() => (navigation as any).navigate('PaymentHistory')}
+          onPress={() => navigation.navigate('PaymentHistory')}
         >
           <View style={styles.menuItemLeft}>
             <View style={styles.menuIconBox}>

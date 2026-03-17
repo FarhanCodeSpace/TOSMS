@@ -15,13 +15,9 @@ import {
   TrackRideScreen,
   StudentProfileScreen,
   EditProfileScreen,
-} from "@screens/Student/StudentScreens";
-import {
   MyRouteScreen,
   AvailabilityScreen,
   StudentAvailabilityScreen,
-} from "@screens/Student/StudentScreens";
-import {
   FeePaymentScreen,
   ChallanViewScreen,
   ChallanDepositScreen,
@@ -116,6 +112,11 @@ const ProfileStackNavigator = () => (
       name="EditProfile"
       component={EditProfileScreen}
       options={{ title: "Edit Profile" }}
+    />
+    <ProfileStack.Screen
+      name="PaymentHistory"
+      component={PaymentHistoryScreen}
+      options={{ title: "Payment History" }}
     />
   </ProfileStack.Navigator>
 );

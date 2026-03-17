@@ -30,6 +30,7 @@ export type StudentRidesStackParamList = {
 export type StudentProfileStackParamList = {
   StudentProfile: undefined;
   EditProfile: undefined;
+  PaymentHistory: undefined;
 };
 
 export type StudentTabParamList = {

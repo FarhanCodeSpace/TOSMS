@@ -1,16 +1,11 @@
-import { initializeApp } from 'firebase/app';
-import {
-  initializeAuth,
-  // @ts-ignore
-  getReactNativePersistence
-} from 'firebase/auth';
-import {
-  initializeFirestore,
-  persistentLocalCache,
-  persistentSingleTabManager
-} from 'firebase/firestore';
+// ⚠️ DO NOT MODIFY - DO NOT ADD initializeFirestore, 
+// memoryLocalCache, persistentLocalCache, or any cache options
+
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { initializeAuth, getReactNativePersistence, getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -21,25 +16,21 @@ const firebaseConfig = {
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
 };
 
-const app = initializeApp(firebaseConfig);
+const app = getApps().length === 0 
+  ? initializeApp(firebaseConfig) 
+  : getApp();
 
-const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(ReactNativeAsyncStorage),
-});
+let auth: any;
+try {
+  auth = initializeAuth(app, {
+    persistence: getReactNativePersistence(AsyncStorage)
+  });
+} catch (e) {
+  auth = getAuth(app);
+}
 
-// persistentLocalCache stores data on device
-// so app loads instantly from cache even with weak/no signal
-// then syncs with Firebase when connection improves
-const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({
-    tabManager: persistentSingleTabManager({
-      forceOwnership: true
-    })
-  }),
-  experimentalAutoDetectLongPolling: true, // Auto-detect when to use long polling
-  ignoreUndefinedProperties: true,       // Good practice for Firestore
-});
-
+const db = getFirestore(app);
 const storage = getStorage(app);
 
-export { app, auth, db, storage };
+export { auth, db, storage };
+export default app;

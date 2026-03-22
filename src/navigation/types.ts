@@ -42,8 +42,12 @@ export type StudentTabParamList = {
 
 export type DriverHomeStackParamList = {
   DriverHome: undefined;
-  CreateRide: undefined;
   DriverAvailability: undefined;
+  ActiveRide: { rideId: string; routeId: string };
+  Passengers: { rideId: string; routeId: string };
+  RideSummary: { rideId: string };
+  TodayStudents: { routeId: string; date: string };
+  DriverProfile: undefined;
 };
 
 export type DriverMyRouteStackParamList = {
@@ -51,8 +55,8 @@ export type DriverMyRouteStackParamList = {
 };
 
 export type DriverActiveRideStackParamList = {
-  ActiveRide: undefined;
-  Passengers: { rideId: string };
+  ActiveRide: { rideId: string; routeId: string };
+  Passengers: { rideId: string; routeId: string };
   RideSummary: { rideId: string };
 };
 
@@ -64,6 +68,7 @@ export type DriverTabParamList = {
   HomeTab: undefined;
   MyRouteTab: undefined;
   ActiveRideTab: undefined;
+  StudentsTab: { routeId?: string; date?: string };
   ProfileTab: undefined;
 };
 

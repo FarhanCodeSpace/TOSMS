@@ -11,6 +11,7 @@ import { useAuth } from "@hooks/useAuth";
 import { COLORS, SPACING } from "@constants/theme";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { AuthStackParamList } from "@navigation/types";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 type LoginScreenProps = {
   navigation: StackNavigationProp<AuthStackParamList, "Login">;
@@ -68,10 +69,12 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.logoEmoji}>🚌</Text>
+        <View style={styles.logoContainer}>
+          <MaterialCommunityIcons name="bus-clock" size={40} color="white" />
+        </View>
         <Text style={styles.logoText}>TOSMS</Text>
         <Text style={styles.subtitle}>
-          Transport Operations & Safety Management System
+          Transport Management
         </Text>
       </View>
 
@@ -87,6 +90,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
           activeOutlineColor={COLORS.primary}
           style={styles.input}
           disabled={isLoading}
+          left={<TextInput.Icon icon={() => <MaterialCommunityIcons name="email-outline" size={24} color={COLORS.textSecondary} />} />}
         />
 
         <TextInput
@@ -99,9 +103,10 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
           activeOutlineColor={COLORS.primary}
           style={styles.input}
           disabled={isLoading}
+          left={<TextInput.Icon icon={() => <MaterialCommunityIcons name="lock-outline" size={24} color={COLORS.textSecondary} />} />}
           right={
             <TextInput.Icon
-              icon={secureText ? "eye" : "eye-off"}
+              icon={() => <MaterialCommunityIcons name={secureText ? "eye-outline" : "eye-off-outline"} size={24} color={COLORS.textSecondary} />}
               onPress={() => setSecureText(!secureText)}
             />
           }
@@ -156,21 +161,27 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: SPACING.xl,
   },
-  logoEmoji: {
-    fontSize: 64,
-    marginBottom: SPACING.xs,
+  logoContainer: {
+    backgroundColor: COLORS.primary,
+    width: 80,
+    height: 80,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    alignSelf: "center",
+    marginBottom: 20,
   },
   logoText: {
-    fontSize: 32,
-    fontWeight: "bold",
+    fontSize: 28,
+    fontWeight: "800",
     color: COLORS.primary,
-    letterSpacing: 2,
+    letterSpacing: 1,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: COLORS.textSecondary,
     textAlign: "center",
-    marginTop: SPACING.xs,
+    marginTop: 2,
   },
   form: {
     width: "100%",

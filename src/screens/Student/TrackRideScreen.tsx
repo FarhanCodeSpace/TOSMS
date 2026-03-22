@@ -176,24 +176,33 @@ export const TrackRideScreen: React.FC<TrackRideScreenProps> = ({ route, navigat
     );
   }
 
-  const mapRegion = liveLocation
+  const mapRegion = (liveLocation && liveLocation.latitude && liveLocation.longitude)
     ? {
         latitude: liveLocation.latitude,
         longitude: liveLocation.longitude,
         latitudeDelta: 0.04,
         longitudeDelta: 0.04,
       }
-    : {
+    : (rideInfo?.startLocation?.latitude && rideInfo?.startLocation?.longitude)
+    ? {
         latitude: rideInfo.startLocation.latitude,
         longitude: rideInfo.startLocation.longitude,
         latitudeDelta: 0.05,
         longitudeDelta: 0.05,
+      }
+    : {
+        latitude: 0,
+        longitude: 0,
+        latitudeDelta: 0.1,
+        longitudeDelta: 0.1,
       };
 
-  const polylineCoords = [
-    { latitude: rideInfo.startLocation.latitude, longitude: rideInfo.startLocation.longitude },
-    { latitude: rideInfo.endLocation.latitude, longitude: rideInfo.endLocation.longitude },
-  ];
+  const polylineCoords = (rideInfo?.startLocation && rideInfo?.endLocation) 
+    ? [
+        { latitude: rideInfo.startLocation.latitude, longitude: rideInfo.startLocation.longitude },
+        { latitude: rideInfo.endLocation.latitude, longitude: rideInfo.endLocation.longitude },
+      ]
+    : [];
 
   return (
     <View style={styles.container}>
@@ -205,41 +214,42 @@ export const TrackRideScreen: React.FC<TrackRideScreenProps> = ({ route, navigat
         <MaterialCommunityIcons name="chevron-left" size={28} color={COLORS.text} />
       </TouchableOpacity>
 
-      {/* State 1 - Waiting Banner */}
-      {rideStatus === 'scheduled' && !liveLocation && (
-        <Animated.View style={[styles.waitingBanner, { opacity: pulseAnim }]}>
-          <Text style={styles.waitingText}>⏳ Waiting for driver to start the ride...</Text>
-        </Animated.View>
-      )}
+
 
       <MapView style={styles.map} region={mapRegion}>
         {/* Route polyline */}
         <Polyline coordinates={polylineCoords} strokeColor={COLORS.primary} strokeWidth={3} />
 
         {/* Start marker */}
-        <Marker
-          coordinate={{ latitude: rideInfo.startLocation.latitude, longitude: rideInfo.startLocation.longitude }}
-          pinColor="green"
-          title="Start"
-          description={rideInfo.startLocation.name}
-        />
+        {rideInfo?.startLocation && (
+          <Marker
+            coordinate={{ latitude: rideInfo.startLocation.latitude, longitude: rideInfo.startLocation.longitude }}
+            pinColor="green"
+            title="Start"
+            description={rideInfo.startLocation.name}
+          />
+        )}
 
         {/* End marker */}
-        <Marker
-          coordinate={{ latitude: rideInfo.endLocation.latitude, longitude: rideInfo.endLocation.longitude }}
-          pinColor="red"
-          title="End"
-          description={rideInfo.endLocation.name}
-        />
+        {rideInfo?.endLocation && (
+          <Marker
+            coordinate={{ latitude: rideInfo.endLocation.latitude, longitude: rideInfo.endLocation.longitude }}
+            pinColor="red"
+            title="End"
+            description={rideInfo.endLocation.name}
+          />
+        )}
 
         {/* Stop markers */}
-        {rideInfo.stops.map((stop, i) => (
-          <Marker
-            key={i}
-            coordinate={{ latitude: rideInfo.startLocation.latitude, longitude: rideInfo.startLocation.longitude }}
-            pinColor="blue"
-            title={stop.stopName}
-          />
+        {rideInfo?.stops?.map((stop, i) => (
+          rideInfo.startLocation && (
+            <Marker
+              key={i}
+              coordinate={{ latitude: rideInfo.startLocation.latitude, longitude: rideInfo.startLocation.longitude }}
+              pinColor="blue"
+              title={stop.stopName}
+            />
+          )
         ))}
 
         {/* State 2 - Animated driver marker */}
@@ -260,41 +270,51 @@ export const TrackRideScreen: React.FC<TrackRideScreenProps> = ({ route, navigat
         )}
       </MapView>
 
-      {/* Bottom Info Card (Active state) */}
-      {rideStatus === 'active' && (
-        <View style={styles.infoCard}>
-          <View style={styles.infoRow}>
-            <View style={styles.infoBlock}>
-              <Text style={styles.infoLabel}>Driver</Text>
-              <Text style={styles.infoValue}>{rideInfo.driverName}</Text>
-            </View>
-            <View style={styles.infoBlock}>
-              <Text style={styles.infoLabel}>Vehicle</Text>
-              <Text style={styles.infoValue}>{rideInfo.vehiclePlate || 'N/A'}</Text>
-            </View>
-            <TouchableOpacity
-              style={styles.callBtn}
-              onPress={() => Linking.openURL(`tel:${rideInfo.driverPhone}`)}
-            >
-              <Text style={styles.callBtnText}>📞</Text>
-            </TouchableOpacity>
+      {/* New Bottom Info Panel */}
+      <View style={styles.bottomPanel}>
+        {rideStatus === 'scheduled' && (
+          <View style={styles.waitingBannerNew}>
+            <MaterialCommunityIcons name="clock-outline" size={18} color="#F59E0B" />
+            <Text style={styles.waitingBannerText}>Waiting for driver to start</Text>
           </View>
-          <View style={styles.statusBadge}>
-            <Text style={styles.statusBadgeText}>🟢 Ride in Progress</Text>
-          </View>
-        </View>
-      )}
+        )}
 
-      {/* Waiting info card */}
-      {rideStatus === 'scheduled' && (
-        <View style={styles.infoCard}>
-          <Text style={styles.infoValue}>{rideInfo.routeName}</Text>
-          <Text style={styles.infoLabel}>Driver: {rideInfo.driverName}</Text>
-          <View style={[styles.statusBadge, { backgroundColor: '#FFF9C4' }]}>
-            <Text style={[styles.statusBadgeText, { color: '#856404' }]}>🟡 Scheduled</Text>
+        <View style={styles.panelTopRow}>
+          <Text style={styles.panelDriverName}>{rideInfo.driverName}</Text>
+          <TouchableOpacity 
+            style={styles.panelPhoneBtn}
+            onPress={() => Linking.openURL(`tel:${rideInfo.driverPhone}`)}
+          >
+            <MaterialCommunityIcons name="phone" size={20} color="white" />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.panelSecondRow}>
+          <MaterialCommunityIcons name="car-info" size={14} color={COLORS.textSecondary} />
+          <Text style={styles.panelVehiclePlate}>
+            {rideInfo.vehiclePlate ? rideInfo.vehiclePlate : 'Vehicle info unavailable'}
+          </Text>
+        </View>
+
+        <View style={styles.panelStatusRow}>
+          <View style={[styles.panelStatusBadge, { 
+            backgroundColor: rideStatus === 'active' ? '#F0FFF4' : 
+                             rideStatus === 'scheduled' ? '#FFF9E6' : '#F3F4F6' 
+          }]}>
+            <View style={[styles.panelStatusDot, { 
+              backgroundColor: rideStatus === 'active' ? '#16A34A' : 
+                               rideStatus === 'scheduled' ? '#F59E0B' : '#9CA3AF' 
+            }]} />
+            <Text style={[styles.panelStatusText, { 
+              color: rideStatus === 'active' ? '#16A34A' : 
+                     rideStatus === 'scheduled' ? '#92400E' : '#6B7280' 
+            }]}>
+              {rideStatus === 'active' ? 'Ride in Progress' : 
+               rideStatus === 'scheduled' ? 'Starting Soon' : 'Ride Completed'}
+            </Text>
           </View>
         </View>
-      )}
+      </View>
     </View>
   );
 };
@@ -340,34 +360,78 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
     elevation: 4,
   },
-  infoCard: {
-    backgroundColor: COLORS.surface,
-    padding: SPACING.md,
+  bottomPanel: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    borderTopWidth: 1,
+    borderColor: '#F0F0F0',
     elevation: 10,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
   },
-  infoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.sm },
-  infoBlock: { flex: 1 },
-  infoLabel: { fontSize: FONTS.sm, color: COLORS.textSecondary },
-  infoValue: { fontSize: FONTS.lg, fontWeight: 'bold', color: COLORS.text },
-  callBtn: {
-    backgroundColor: COLORS.success,
+  panelTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  panelDriverName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  panelPhoneBtn: {
     width: 44,
     height: 44,
+    backgroundColor: '#16A34A',
     borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  callBtnText: { fontSize: 20 },
-  statusBadge: {
-    backgroundColor: '#E8F5E9',
-    borderRadius: 20,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 4,
-    alignSelf: 'flex-start',
+  panelSecondRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 6,
   },
-  statusBadgeText: { fontWeight: 'bold', color: '#2E7D32', fontSize: FONTS.sm },
+  panelVehiclePlate: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+  },
+  panelStatusRow: {
+    marginTop: 10,
+    alignItems: 'flex-start',
+  },
+  panelStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    gap: 6,
+  },
+  panelStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  panelStatusText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  waitingBannerNew: {
+    backgroundColor: '#FFF9E6',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  waitingBannerText: {
+    fontSize: 14,
+    color: '#92400E',
+    fontWeight: '500',
+  },
   completedOverlay: {
     flex: 1,
     justifyContent: 'center',

@@ -2,7 +2,7 @@ export const COLLECTIONS = {
   USERS: "users",
   RIDES: "rides",
   BOOKINGS: "bookings",
-  LIVE_LOCATIONS: "live_locations",
+  LIVE_LOCATIONS: "liveLocations",
   PAYMENTS: "payments",
   NOTIFICATIONS: "notifications",
   REVIEWS: "reviews",

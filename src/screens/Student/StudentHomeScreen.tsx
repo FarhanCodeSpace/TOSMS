@@ -6,6 +6,8 @@ import {
   RefreshControl,
   TouchableOpacity,
   ActivityIndicator,
+  Animated,
+  Easing,
 } from 'react-native';
 import { Text, Avatar, Card, Button } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -14,15 +16,13 @@ import { COLORS } from '@constants/theme';
 import { db } from '@config/firebase';
 import { COLLECTIONS } from '@config/firebaseCollections';
 import { collection, query, where, getDocs, onSnapshot, doc, limit } from 'firebase/firestore';
-import { format, addDays, startOfWeek } from 'date-fns';
+import { format, addDays } from 'date-fns';
+import { getPakistanTodayString, getPakistanTomorrowString } from '@utils/dateHelpers';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { StudentHomeStackParamList } from '@navigation/types';
+import { StatusBar } from 'expo-status-bar';
 
-type StudentHomeScreenProps = {
-  navigation: StackNavigationProp<StudentHomeStackParamList, 'StudentHome'>;
-};
-
-const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({ navigation }) => {
+const StudentHomeScreen: React.FC<{ navigation: StackNavigationProp<StudentHomeStackParamList, 'StudentHome'> }> = ({ navigation }) => {
   const { currentUser } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const [myRoute, setMyRoute] = useState<any>(null);
@@ -32,9 +32,10 @@ const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({ navigation }) => 
   const [availabilityDoc, setAvailabilityDoc] = useState<any>(null);
   const [weekAvailability, setWeekAvailability] = useState<Record<string, any>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [pulseAnim] = useState(new Animated.Value(1));
+  const [spinAnim] = useState(new Animated.Value(0));
 
-  const tomorrow = addDays(new Date(), 1);
-  const tomorrowStr = format(tomorrow, 'yyyy-MM-dd');
+  const tomorrowStr = getPakistanTomorrowString();
 
   useEffect(() => {
     if (!currentUser?.uid) return;
@@ -54,22 +55,22 @@ const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({ navigation }) => 
     });
 
     // 2. Today's Ride Listener
-    const todayStr = new Date().toISOString().split('T')[0];
-    const rideQuery = query(
-      collection(db, COLLECTIONS.RIDES),
-      where('date', '==', todayStr),
-      where('status', 'in', ['scheduled', 'active'])
-    );
-    const unsubscribeRide = onSnapshot(rideQuery, (snapshot) => {
-      const activeRide = snapshot.docs.find(doc => {
-        const data = doc.data();
-        return data.studentIds?.includes(currentUser.uid) || data.routeId === currentUser.routeId;
+    let unsubscribeRide = () => {};
+    if (currentUser.routeId) {
+      const rideQuery = query(
+        collection(db, COLLECTIONS.RIDES),
+        where('routeId', '==', currentUser.routeId),
+        where('status', 'in', ['scheduled', 'active', 'completed'])
+      );
+      unsubscribeRide = onSnapshot(rideQuery, (snapshot) => {
+        const todayStr = getPakistanTodayString();
+        const activeRide = snapshot.docs.find(doc => doc.data().date === todayStr);
+        setTodayRide(activeRide ? { rideId: activeRide.id, ...activeRide.data() } : null);
       });
-      setTodayRide(activeRide ? { id: activeRide.id, ...activeRide.data() } : null);
-    });
+    }
 
     // 3. Fee Status Listener
-    const currentMonth = format(new Date(), 'yyyy-MM');
+    const currentMonth = getPakistanTodayString().substring(0, 7); // 'yyyy-MM'
     const feeQuery = query(
       collection(db, COLLECTIONS.FEE_PAYMENTS),
       where('studentId', '==', currentUser.uid),
@@ -95,8 +96,11 @@ const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({ navigation }) => 
     });
 
     // 5. Week Availability Listener
-    const today = new Date();
-    const next7Days = Array.from({ length: 7 }, (_, i) => format(addDays(today, i), 'yyyy-MM-dd'));
+    const today = new Date(); // Using for loop logic below, keep for now if needed or refactor
+    const next7Days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(new Date(getPakistanTodayString() + 'T00:00:00').getTime() + (i * 24 * 60 * 60 * 1000));
+      return d.toISOString().split('T')[0];
+    });
     const weekQuery = query(
       collection(db, COLLECTIONS.AVAILABILITY),
       where('userId', '==', currentUser.uid),
@@ -120,6 +124,44 @@ const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({ navigation }) => 
     };
   }, [currentUser?.uid]);
 
+  useEffect(() => {
+    if (todayRide?.status === 'active') {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 0.3,
+            duration: 800,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 800,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+
+      Animated.loop(
+        Animated.timing(spinAnim, {
+          toValue: 1,
+          duration: 2000,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        })
+      ).start();
+    } else {
+      pulseAnim.setValue(1);
+      spinAnim.setValue(0);
+    }
+  }, [todayRide?.status]);
+
+  const spin = spinAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg']
+  });
+
   const onRefresh = () => {
     setRefreshing(true);
     setTimeout(() => setRefreshing(false), 1000);
@@ -134,7 +176,7 @@ const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({ navigation }) => 
 
   const getDayStatusColor = (dateStr: string) => {
     const avail = weekAvailability[dateStr];
-    const isToday = format(new Date(), 'yyyy-MM-dd') === dateStr;
+    const isToday = getPakistanTodayString() === dateStr;
     if (avail?.isAvailable === true) return '#16A34A';
     if (avail?.isAvailable === false) return '#DC2626';
     if (isToday) return COLORS.primary;
@@ -143,6 +185,7 @@ const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({ navigation }) => 
 
   return (
     <View style={styles.container}>
+      <StatusBar style="light" />
       {isLoading ? (
           <View style={styles.centered}><ActivityIndicator color={COLORS.primary} /></View>
       ) : (
@@ -276,38 +319,6 @@ const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({ navigation }) => 
                 </TouchableOpacity>
             </ScrollView>
 
-            {/* ── Today's Ride Section ── */}
-            {todayRide && (
-                <View style={styles.sectionPadding}>
-                    <Text style={styles.sectionTitle}>Today's Ride</Text>
-                    <Card style={styles.rideCard} elevation={2}>
-                        <View style={styles.rideCardContent}>
-                            <View style={styles.rideHeaderRow}>
-                                <MaterialCommunityIcons name="bus" size={20} color={COLORS.primary} />
-                                <Text style={styles.rideRouteName}>{todayRide.routeName}</Text>
-                            </View>
-                            <View style={styles.rideInfoGrid}>
-                                <View style={styles.rideInfoItem}>
-                                    <MaterialCommunityIcons name="clock-outline" size={14} color={COLORS.textSecondary} />
-                                    <Text style={styles.rideInfoText}>{todayRide.departureTime}</Text>
-                                </View>
-                                <View style={styles.rideInfoItem}>
-                                    <MaterialCommunityIcons name="account" size={14} color={COLORS.textSecondary} />
-                                    <Text style={styles.rideInfoText}>{todayRide.driverName}</Text>
-                                </View>
-                            </View>
-                            <Button 
-                                mode="contained" 
-                                style={styles.trackBtn} 
-                                buttonColor={COLORS.primary}
-                                onPress={() => navigation.navigate('TrackRide', { rideId: todayRide.id })}
-                            >
-                                Track Ride →
-                            </Button>
-                        </View>
-                    </Card>
-                </View>
-            )}
 
             {/* ── Upcoming Availability Section ── */}
             <View style={styles.sectionPadding}>
@@ -328,6 +339,93 @@ const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({ navigation }) => 
                         );
                     })}
                 </ScrollView>
+            </View>
+
+            {/* ── Today's Ride Section (Moved to Bottom) ── */}
+            <View style={styles.sectionPadding}>
+                <Text style={styles.sectionTitle}>Today's Ride</Text>
+                <View style={styles.todayCardWrapper}>
+                    {!todayRide ? (
+                        <View style={styles.noRideCard}>
+                            <MaterialCommunityIcons name="bus-clock" size={36} color="#D1D5DB" />
+                            <Text style={styles.noRideTitle}>No ride today</Text>
+                            <Text style={styles.noRideSub}>Your driver hasn't scheduled a ride yet</Text>
+                        </View>
+                    ) : todayRide.status === 'scheduled' ? (
+                        <View style={styles.rideStateCard}>
+                            <View style={[styles.rideAccentBar, { backgroundColor: '#F59E0B' }]} />
+                            <View style={styles.rideTopRow}>
+                                <Text style={styles.rideCardTitle}>{todayRide.routeName}</Text>
+                                <View style={[styles.rideStatusPill, { backgroundColor: '#FFF9E6' }]}>
+                                    <Text style={[styles.rideStatusText, { color: '#92400E' }]}>Scheduled</Text>
+                                </View>
+                            </View>
+                            <View style={styles.rideMiddleRow}>
+                                <View style={styles.rideInfoItem}>
+                                    <MaterialCommunityIcons name="clock-outline" size={14} color={COLORS.textSecondary} />
+                                    <Text style={styles.rideInfoText}>{todayRide.departureTime}</Text>
+                                </View>
+                                <View style={styles.rideInfoItem}>
+                                    <MaterialCommunityIcons name="account" size={14} color={COLORS.textSecondary} />
+                                    <Text style={styles.rideInfoText}>{todayRide.driverName}</Text>
+                                </View>
+                            </View>
+                            <TouchableOpacity 
+                                style={[styles.rideActionBtn, { backgroundColor: COLORS.primary }]}
+                                onPress={() => navigation.navigate('TrackRide', { rideId: todayRide.rideId })}
+                            >
+                                <MaterialCommunityIcons name="map-marker-path" size={16} color="white" />
+                                <Text style={styles.rideActionBtnText}>Track Ride</Text>
+                            </TouchableOpacity>
+                        </View>
+                    ) : todayRide.status === 'active' ? (
+                        <View style={styles.rideStateCard}>
+                            <View style={[styles.rideAccentBar, { backgroundColor: '#16A34A' }]} />
+                            <View style={styles.rideTopRow}>
+                                <Text style={styles.rideCardTitle}>{todayRide.routeName}</Text>
+                                <View style={[styles.rideStatusPill, { backgroundColor: '#16A34A', flexDirection: 'row', gap: 6 }]}>
+                                    <Animated.View style={[styles.liveDot, { opacity: pulseAnim }]} />
+                                    <Text style={[styles.rideStatusText, { color: 'white', letterSpacing: 0.5 }]}>LIVE</Text>
+                                </View>
+                            </View>
+                            <View style={styles.rideMiddleRow}>
+                                <View style={styles.rideInfoItem}>
+                                    <MaterialCommunityIcons name="account" size={14} color={COLORS.textSecondary} />
+                                    <Text style={styles.rideInfoText}>{todayRide.driverName}</Text>
+                                </View>
+                            </View>
+                            <TouchableOpacity 
+                                style={[styles.rideActionBtn, { backgroundColor: '#16A34A' }]}
+                                onPress={() => navigation.navigate('TrackRide', { rideId: todayRide.rideId })}
+                            >
+                                <Animated.View style={{ transform: [{ rotate: spin }] }}>
+                                    <MaterialCommunityIcons name="navigation" size={16} color="white" />
+                                </Animated.View>
+                                <Text style={styles.rideActionBtnText}>Track Now</Text>
+                            </TouchableOpacity>
+                        </View>
+                    ) : (
+                        <View style={styles.rideStateCard}>
+                            <View style={[styles.rideAccentBar, { backgroundColor: '#9CA3AF' }]} />
+                            <View style={styles.rideTopRow}>
+                                <Text style={[styles.rideCardTitle, { color: '#6B7280' }]}>{todayRide.routeName}</Text>
+                                <View style={[styles.rideStatusPill, { backgroundColor: '#F3F4F6' }]}>
+                                    <Text style={[styles.rideStatusText, { color: '#6B7280' }]}>Completed</Text>
+                                </View>
+                            </View>
+                            <View style={styles.rideMiddleRow}>
+                                <View style={styles.rideInfoItem}>
+                                    <MaterialCommunityIcons name="check-circle" size={14} color="#9CA3AF" />
+                                    <Text style={[styles.rideInfoText, { color: '#9CA3AF' }]}>Ride completed</Text>
+                                </View>
+                                <View style={styles.rideInfoItem}>
+                                    <MaterialCommunityIcons name="calendar" size={14} color={COLORS.textSecondary} />
+                                    <Text style={styles.rideInfoText}>{todayRide.date ? format(new Date(todayRide.date), 'MMM d, yyyy') : format(new Date(), 'MMM d, yyyy')}</Text>
+                                </View>
+                            </View>
+                        </View>
+                    )}
+                </View>
             </View>
 
             <View style={{ height: 40 }} />
@@ -366,13 +464,108 @@ const styles = StyleSheet.create({
   sectionPadding: { paddingHorizontal: 16, paddingTop: 8 },
   sectionTitle: { fontSize: 15, fontWeight: '600', color: COLORS.text, marginBottom: 10, marginTop: 10 },
   rideCard: { backgroundColor: 'white', borderRadius: 12, overflow: 'hidden' },
-  rideCardContent: { padding: 16 },
-  rideHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
-  rideRouteName: { fontSize: 15, fontWeight: '600', color: COLORS.text },
-  rideInfoGrid: { gap: 6, marginBottom: 14 },
-  rideInfoItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  rideInfoText: { fontSize: 13, color: COLORS.textSecondary },
-  trackBtn: { borderRadius: 8, paddingVertical: 4 },
+  todayCardWrapper: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+    marginBottom: 24,
+  },
+  rideStateCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 0,
+    elevation: 0,
+    padding: 16,
+    position: 'relative',
+  },
+  rideAccentBar: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    borderRadius: 4,
+  },
+  rideTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  rideCardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  rideStatusPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rideStatusText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'white',
+  },
+  rideMiddleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 16,
+  },
+  rideInfoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  rideInfoText: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+  },
+  rideActionBtn: {
+    marginTop: 14,
+    borderRadius: 10,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  rideActionBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: 'white',
+  },
+  noRideCard: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderStyle: 'dashed',
+    alignItems: 'center',
+  },
+  noRideTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#9CA3AF',
+    marginTop: 8,
+  },
+  noRideSub: {
+    fontSize: 12,
+    color: '#D1D5DB',
+    marginTop: 4,
+    textAlign: 'center',
+  },
   chipsRow: { gap: 10, paddingBottom: 10 },
   dayChip: { width: 40, height: 56, borderRadius: 10, backgroundColor: 'white', alignItems: 'center', justifyContent: 'center' },
   dayLabel: { fontSize: 10, color: COLORS.textSecondary, textTransform: 'uppercase' },

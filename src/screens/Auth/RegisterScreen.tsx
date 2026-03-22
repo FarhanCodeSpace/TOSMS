@@ -5,6 +5,8 @@ import { useAuth } from "@hooks/useAuth";
 import { COLORS, SPACING } from "@constants/theme";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { AuthStackParamList } from "@navigation/types";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+
 
 type RegisterScreenProps = {
   navigation: StackNavigationProp<AuthStackParamList, "Register">;
@@ -78,7 +80,10 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Join TOSMS</Text>
+        <View style={styles.logoContainer}>
+          <MaterialCommunityIcons name="bus-clock" size={40} color="white" />
+        </View>
+        <Text style={styles.logoText}>TOSMS</Text>
         <Text style={styles.subtitle}>Create your account to get started</Text>
       </View>
 
@@ -100,7 +105,11 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
                 : styles.roleTextInactive,
             ]}
           >
-            Student 🎓
+            <MaterialCommunityIcons 
+              name="account-school" 
+              size={18} 
+              color={role === "student" ? COLORS.surface : COLORS.primary} 
+            /> Student
           </Text>
         </TouchableOpacity>
 
@@ -121,7 +130,11 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
                 : styles.roleTextInactive,
             ]}
           >
-            Driver 🚗
+            <MaterialCommunityIcons 
+              name="steering" 
+              size={18} 
+              color={role === "driver" ? COLORS.surface : COLORS.primary} 
+            /> Driver
           </Text>
         </TouchableOpacity>
       </View>
@@ -136,6 +149,7 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
           activeOutlineColor={COLORS.primary}
           style={styles.input}
           disabled={isLoading}
+          left={<TextInput.Icon icon={() => <MaterialCommunityIcons name="account-outline" size={24} color={COLORS.textSecondary} />} />}
         />
 
         <TextInput
@@ -149,6 +163,7 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
           activeOutlineColor={COLORS.primary}
           style={styles.input}
           disabled={isLoading}
+          left={<TextInput.Icon icon={() => <MaterialCommunityIcons name="email-outline" size={24} color={COLORS.textSecondary} />} />}
         />
 
         <TextInput
@@ -163,6 +178,7 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
           activeOutlineColor={COLORS.primary}
           style={styles.input}
           disabled={isLoading}
+          left={<TextInput.Icon icon={() => <MaterialCommunityIcons name="phone-outline" size={24} color={COLORS.textSecondary} />} />}
         />
 
         <TextInput
@@ -175,9 +191,10 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
           activeOutlineColor={COLORS.primary}
           style={styles.input}
           disabled={isLoading}
+          left={<TextInput.Icon icon={() => <MaterialCommunityIcons name="lock-outline" size={24} color={COLORS.textSecondary} />} />}
           right={
             <TextInput.Icon
-              icon={secureText ? "eye" : "eye-off"}
+              icon={() => <MaterialCommunityIcons name={secureText ? "eye-outline" : "eye-off-outline"} size={24} color={COLORS.textSecondary} />}
               onPress={() => setSecureText(!secureText)}
             />
           }
@@ -193,6 +210,7 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
           activeOutlineColor={COLORS.primary}
           style={styles.input}
           disabled={isLoading}
+          left={<TextInput.Icon icon={() => <MaterialCommunityIcons name="lock-outline" size={24} color={COLORS.textSecondary} />} />}
         />
 
         {error && (
@@ -235,10 +253,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: SPACING.lg,
   },
-  title: {
+  logoContainer: {
+    backgroundColor: COLORS.primary,
+    width: 80,
+    height: 80,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    alignSelf: "center",
+    marginBottom: 20,
+  },
+  logoText: {
     fontSize: 28,
-    fontWeight: "bold",
+    fontWeight: "800",
     color: COLORS.primary,
+    letterSpacing: 1,
   },
   subtitle: {
     fontSize: 14,

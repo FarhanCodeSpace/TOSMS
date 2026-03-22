@@ -22,6 +22,7 @@ import {
 } from 'firebase/firestore';
 import { useAuth } from '@hooks/useAuth';
 import { COLORS, SPACING, FONTS } from '@constants/theme';
+import { getPakistanTodayString, getPakistanTomorrowString, formatPakistanDate } from '@utils/dateHelpers';
 import { format, addDays, subDays } from 'date-fns';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { StudentHomeStackParamList } from '@navigation/types';
@@ -39,9 +40,8 @@ export const AvailabilityScreen: React.FC<AvailabilityScreenProps> = ({ navigati
   const [isSaving, setIsSaving] = useState(false);
   const [history, setHistory] = useState<Record<string, boolean | null>>({});
 
-  const tomorrow = addDays(new Date(), 1);
-  const tomorrowString = format(tomorrow, 'yyyy-MM-dd');
-  const tomorrowDisplay = format(tomorrow, "EEEE, MMMM d");
+  const tomorrowString = getPakistanTomorrowString();
+  const tomorrowDisplay = formatPakistanDate(tomorrowString);
 
   useEffect(() => {
     fetchCurrentAvailability();
@@ -106,9 +106,7 @@ export const AvailabilityScreen: React.FC<AvailabilityScreenProps> = ({ navigati
     
     setIsSaving(true);
     try {
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const dateString = tomorrow.toISOString().split('T')[0];
+      const dateString = getPakistanTomorrowString();
       const docId = currentUser.uid + '_' + dateString;
       const docRef = doc(db, COLLECTIONS.AVAILABILITY, docId);
       

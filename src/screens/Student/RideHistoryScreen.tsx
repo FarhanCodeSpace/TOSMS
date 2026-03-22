@@ -7,7 +7,9 @@ import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestor
 import { useAuth } from '@hooks/useAuth';
 import { COLORS, SPACING, FONTS } from '@constants/theme';
 import { format, parseISO } from 'date-fns';
+import { getDoc, doc } from 'firebase/firestore';
 import { Availability } from '../../types';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 interface AvailabilityWithId extends Availability {
   availabilityId: string;
@@ -16,7 +18,26 @@ interface AvailabilityWithId extends Availability {
 export const RideHistoryScreen: React.FC = () => {
   const { currentUser } = useAuth();
   const [records, setRecords] = useState<AvailabilityWithId[]>([]);
+  const [routeName, setRouteName] = useState('Loading...');
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!currentUser?.routeId) {
+      setRouteName('No Route');
+      return;
+    }
+    const fetchRoute = async () => {
+      try {
+        const routeSnap = await getDoc(doc(db, COLLECTIONS.ROUTES, currentUser.routeId));
+        if (routeSnap.exists()) {
+          setRouteName(routeSnap.data().routeName);
+        }
+      } catch (err) {
+        console.error('Error fetching route:', err);
+      }
+    };
+    fetchRoute();
+  }, [currentUser?.routeId]);
 
   useEffect(() => {
     if (!currentUser?.uid) return;
@@ -52,15 +73,20 @@ export const RideHistoryScreen: React.FC = () => {
               {format(parseISO(item.date), 'EEEE, MMM d, yyyy')}
             </Text>
             <Text style={styles.routeText}>
-              {item.routeId ? 'Route Assigned' : 'No Route'}
+              {routeName}
             </Text>
           </View>
-          <Chip
-            style={{ backgroundColor: item.isAvailable ? COLORS.success : COLORS.error }}
-            textStyle={{ color: 'white', fontSize: 11 }}
-          >
-            {item.isAvailable ? 'Rode' : 'Absent'}
-          </Chip>
+          <View style={[
+            styles.statusBadge,
+            { backgroundColor: item.isAvailable ? '#DCFCE7' : '#F3F4F6' }
+          ]}>
+            <Text style={[
+              styles.statusText,
+              { color: item.isAvailable ? '#16A34A' : '#6B7280' }
+            ]}>
+              {item.isAvailable ? 'Rode ✓' : 'Did Not Ride'}
+            </Text>
+          </View>
         </View>
       </Card.Content>
     </Card>
@@ -88,9 +114,9 @@ export const RideHistoryScreen: React.FC = () => {
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={{ fontSize: 48 }}>🚗</Text>
+            <MaterialCommunityIcons name="history" size={48} color="#D1D5DB" />
             <Text style={styles.emptyTitle}>No ride history yet</Text>
-            <Text style={styles.emptySubtitle}>Your past availability marks will appear here.</Text>
+            <Text style={styles.emptySubtitle}>Your availability history will appear here.</Text>
           </View>
         }
       />
@@ -112,6 +138,15 @@ const styles = StyleSheet.create({
   emptyContainer: { alignItems: 'center', paddingTop: 80 },
   emptyTitle: { fontSize: FONTS.xl, fontWeight: 'bold', color: COLORS.textSecondary, marginTop: 12 },
   emptySubtitle: { color: COLORS.textSecondary, fontSize: FONTS.md, marginTop: 4, textAlign: 'center', paddingHorizontal: SPACING.lg },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
 });
 
 export default RideHistoryScreen;

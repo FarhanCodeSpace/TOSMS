@@ -1,42 +1,44 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Alert, Image } from 'react-native';
-import { Text, Button } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, Alert, Image, ActivityIndicator } from 'react-native';
+import { Text, Divider } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { db } from '@config/firebase';
 import { COLLECTIONS } from '@config/firebaseCollections';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { useAuth } from '@hooks/useAuth';
-import { COLORS, SPACING, FONTS } from '@constants/theme';
-import { formatDistanceToNow } from 'date-fns';
+import { COLORS, FONTS } from '@constants/theme';
+import { formatDistanceToNow, format } from 'date-fns';
+import { TouchableOpacity } from 'react-native-gesture-handler';
 
 const getInitials = (name: string): string => {
+  if (!name) return '';
   const parts = name.trim().split(' ');
   const first = parts[0]?.[0] || '';
   const last = parts[parts.length - 1]?.[0] || '';
   return (first + last).toUpperCase();
 };
 
-const StarRating: React.FC<{ rating: number }> = ({ rating }) => (
-  <View style={{ flexDirection: 'row' }}>
-    {[1, 2, 3, 4, 5].map(i => (
-      <Text key={i} style={{ fontSize: 20, color: i <= Math.round(rating) ? COLORS.accent : '#D0D0D0' }}>
-        ★
-      </Text>
-    ))}
-  </View>
-);
+const getVehicleIcon = (type?: string): any => {
+  const t = type?.toLowerCase() || '';
+  if (t === 'van') return 'van-utility';
+  if (t === 'bus') return 'bus';
+  if (t === 'coaster') return 'bus-side';
+  return 'car-info';
+};
 
-const vehicleIcon = (type?: string): string => {
-  switch (type?.toLowerCase()) {
-    case 'van': return '🚐';
-    case 'bus': return '🚌';
-    case 'coaster': return '🚎';
-    default: return '🚗';
-  }
+const formatTime = (time: any) => {
+  if (!time) return 'N/A';
+  if (typeof time === 'string') return time;
+  if (time.toDate) return format(time.toDate(), 'h:mm a');
+  if (time instanceof Date) return format(time, 'h:mm a');
+  return String(time);
 };
 
 export const DriverProfileScreen: React.FC = () => {
   const { currentUser, logout } = useAuth();
   const [totalRides, setTotalRides] = useState(0);
+  const [route, setRoute] = useState<any>(null);
+  const [loadingRoute, setLoadingRoute] = useState(true);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -53,7 +55,30 @@ export const DriverProfileScreen: React.FC = () => {
         console.error('Error fetching driver stats:', error);
       }
     };
+
+    const fetchRoute = async () => {
+      if (!currentUser?.uid) return;
+      try {
+        const q = query(
+          collection(db, COLLECTIONS.ROUTES),
+          where('assignedDriverId', '==', currentUser.uid),
+          limit(1)
+        );
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          setRoute(snap.docs[0].data());
+        } else {
+          setRoute(null);
+        }
+      } catch (error) {
+        console.error('Error fetching driver route:', error);
+      } finally {
+        setLoadingRoute(false);
+      }
+    };
+
     fetchStats();
+    fetchRoute();
   }, [currentUser?.uid]);
 
   const handleLogout = () => {
@@ -76,7 +101,7 @@ export const DriverProfileScreen: React.FC = () => {
 
   return (
     <ScrollView style={styles.container}>
-      {/* Profile Header */}
+      {/* Header Section */}
       <View style={styles.header}>
         {avatarSource ? (
           <Image source={{ uri: avatarSource }} style={styles.avatar} />
@@ -86,116 +111,288 @@ export const DriverProfileScreen: React.FC = () => {
           </View>
         )}
         <Text style={styles.fullName}>{currentUser?.fullName}</Text>
-        <Text style={styles.email}>{currentUser?.email}</Text>
-        <Text style={styles.phone}>{currentUser?.phone}</Text>
+        
+        <View style={styles.contactRow}>
+          <MaterialCommunityIcons name="email-outline" size={14} color="white" style={{ opacity: 0.7 }} />
+          <Text style={styles.contactText}>{currentUser?.email}</Text>
+        </View>
+
+        <View style={styles.contactRow}>
+          <MaterialCommunityIcons name="phone-outline" size={14} color="white" style={{ opacity: 0.7 }} />
+          <Text style={styles.contactText}>{currentUser?.phone}</Text>
+        </View>
+
         <Text style={styles.memberSince}>Driver since {memberSince}</Text>
       </View>
 
-      {/* Rating */}
-      <View style={styles.ratingSection}>
-        <Text style={styles.sectionTitle}>Rating</Text>
-        <StarRating rating={currentUser?.rating || 0} />
-        <Text style={styles.ratingText}>{(currentUser?.rating || 0).toFixed(1)} / 5.0</Text>
-      </View>
+      <View style={styles.contentArea}>
+        {/* Status Cards Row */}
+        <View style={styles.statusCardsRow}>
+          {/* Rating */}
+          <View style={styles.statusCol}>
+            <MaterialCommunityIcons name="star" size={20} color="#F59E0B" />
+            <Text style={styles.statusValue}>{(currentUser?.rating || 0).toFixed(1)}</Text>
+            <Text style={styles.statusLabel}>Rating</Text>
+          </View>
+          
+          <Divider style={styles.statusDivider} />
+          
+          {/* Rides Done */}
+          <View style={styles.statusCol}>
+            <MaterialCommunityIcons name="check-circle" size={20} color="#16A34A" />
+            <Text style={styles.statusValue}>{totalRides}</Text>
+            <Text style={styles.statusLabel}>Rides Done</Text>
+          </View>
+          
+          <Divider style={styles.statusDivider} />
 
-      {/* Vehicle Info (No earnings shown!) */}
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Vehicle Information</Text>
-        <View style={styles.vehicleRow}>
-          <Text style={styles.vehicleIcon}>{vehicleIcon(currentUser?.vehicleType)}</Text>
-          <View>
-            <Text style={styles.vehicleType}>{currentUser?.vehicleType || 'Not set'}</Text>
-            <Text style={styles.vehiclePlate}>{currentUser?.vehiclePlate || 'Plate: N/A'}</Text>
-            <Text style={styles.vehicleCapacity}>Capacity: {currentUser?.vehicleCapacity || 'N/A'} seats</Text>
+          {/* Route Count / Assigned */}
+          <View style={styles.statusCol}>
+            <MaterialCommunityIcons name="map-marker-path" size={20} color={COLORS.primary} />
+            <Text style={styles.statusValue}>{route ? '1' : '0'}</Text>
+            <Text style={styles.statusLabel}>Route</Text>
           </View>
         </View>
-      </View>
 
-      {/* Total Rides (No earnings!) */}
-      <View style={styles.statsRow}>
-        <View style={styles.statBox}>
-          <Text style={styles.statValue}>{totalRides}</Text>
-          <Text style={styles.statLabel}>Total Completed Rides</Text>
+        {/* Vehicle Card */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <MaterialCommunityIcons name="car-info" size={18} color={COLORS.primary} />
+            <Text style={styles.cardHeaderTitle}>Vehicle Information</Text>
+          </View>
+          <View style={styles.cardContent}>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Type</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <MaterialCommunityIcons 
+                  name={getVehicleIcon(currentUser?.vehicleType)} 
+                  size={16} 
+                  color={COLORS.text} 
+                  style={{ marginRight: 4 }} 
+                />
+                <Text style={styles.infoValue}>
+                  {currentUser?.vehicleType ? currentUser.vehicleType.charAt(0).toUpperCase() + currentUser.vehicleType.slice(1) : 'Not set'}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Plate</Text>
+              <Text style={styles.infoValue}>{currentUser?.vehiclePlate || 'N/A'}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Capacity</Text>
+              <Text style={styles.infoValue}>{currentUser?.vehicleCapacity || '0'} seats</Text>
+            </View>
+          </View>
         </View>
-      </View>
 
-      {/* Logout */}
-      <View style={styles.actions}>
-        <Button
-          mode="outlined"
-          textColor={COLORS.error}
-          style={[styles.actionBtn, { borderColor: COLORS.error }]}
-          onPress={handleLogout}
-        >
-          Logout
-        </Button>
+        {/* Route Card */}
+        <View style={[styles.card, { marginTop: 12 }]}>
+          <View style={styles.cardHeader}>
+            <MaterialCommunityIcons name="map-marker-path" size={18} color={COLORS.primary} />
+            <Text style={styles.cardHeaderTitle}>My Route</Text>
+          </View>
+          <View style={styles.cardContent}>
+            {loadingRoute ? (
+              <ActivityIndicator color={COLORS.primary} />
+            ) : route ? (
+              <View>
+                <Text style={styles.routeName}>{route.routeName || route.name}</Text>
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Departure</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <MaterialCommunityIcons name="clock-outline" size={14} color={COLORS.text} style={{ marginRight: 4 }} />
+                    <Text style={styles.infoValue}>{formatTime(route.departureTime)}</Text>
+                  </View>
+                </View>
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Return</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <MaterialCommunityIcons name="clock-outline" size={14} color={COLORS.text} style={{ marginRight: 4 }} />
+                    <Text style={styles.infoValue}>{formatTime(route.returnTime)}</Text>
+                  </View>
+                </View>
+              </View>
+            ) : (
+              <Text style={styles.noRouteText}>No route assigned</Text>
+            )}
+          </View>
+        </View>
+
+        {/* Logout Button */}
+        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.7}>
+          <MaterialCommunityIcons name="logout" size={18} color="#DC2626" />
+          <Text style={styles.logoutText}>Logout</Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+  container: { 
+    flex: 1, 
+    backgroundColor: '#F8F9FA' 
+  },
   header: {
     alignItems: 'center',
     backgroundColor: COLORS.primary,
-    paddingTop: 60,
-    paddingBottom: SPACING.xl,
-    paddingHorizontal: SPACING.md,
+    paddingTop: 50,
+    paddingBottom: 30,
+    paddingHorizontal: 20,
   },
-  avatar: { width: 96, height: 96, borderRadius: 48, borderWidth: 3, borderColor: 'white', marginBottom: SPACING.md },
+  avatar: { 
+    width: 88, 
+    height: 88, 
+    borderRadius: 44, 
+    borderWidth: 3, 
+    borderColor: 'white', 
+    marginBottom: 12 
+  },
   avatarFallback: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
     backgroundColor: COLORS.accent,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: SPACING.md,
+    marginBottom: 12,
     borderWidth: 3,
     borderColor: 'white',
   },
-  avatarInitials: { color: 'white', fontSize: 32, fontWeight: 'bold' },
-  fullName: { fontSize: FONTS.xxl, fontWeight: 'bold', color: 'white', marginBottom: 4 },
-  email: { color: 'rgba(255,255,255,0.75)', fontSize: FONTS.md, marginBottom: 2 },
-  phone: { color: 'rgba(255,255,255,0.75)', fontSize: FONTS.md, marginBottom: 2 },
-  memberSince: { color: 'rgba(255,255,255,0.6)', fontSize: FONTS.sm, marginTop: 4 },
-  ratingSection: {
-    backgroundColor: COLORS.surface,
-    margin: SPACING.md,
-    padding: SPACING.md,
-    borderRadius: 12,
-    elevation: 2,
+  avatarInitials: { 
+    color: 'white', 
+    fontSize: 32, 
+    fontWeight: 'bold' 
+  },
+  fullName: { 
+    fontSize: 22, 
+    fontWeight: '800', 
+    color: 'white', 
+    marginBottom: 6 
+  },
+  contactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  contactText: {
+    color: 'white',
+    opacity: 0.7,
+    fontSize: 13,
+    marginLeft: 6,
+  },
+  memberSince: { 
+    color: 'white', 
+    opacity: 0.5, 
+    fontSize: 12, 
+    marginTop: 6 
+  },
+  contentArea: {
+    backgroundColor: '#F8F9FA',
+  },
+  statusCardsRow: {
+    flexDirection: 'row',
+    backgroundColor: 'white',
+    marginHorizontal: 16,
+    marginTop: -20,
+    borderRadius: 16,
+    padding: 16,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 8,
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
+  statusCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statusDivider: {
+    width: 1,
+    height: '100%',
+    backgroundColor: '#F0F0F0',
+  },
+  statusValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: COLORS.text,
+    marginTop: 4,
+  },
+  statusLabel: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
   card: {
-    backgroundColor: COLORS.surface,
-    marginHorizontal: SPACING.md,
-    marginBottom: SPACING.md,
-    padding: SPACING.md,
-    borderRadius: 12,
-    elevation: 2,
+    marginHorizontal: 16,
+    marginTop: 16,
+    backgroundColor: 'white',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
   },
-  sectionTitle: { fontSize: FONTS.lg, fontWeight: 'bold', color: COLORS.text, marginBottom: SPACING.sm },
-  ratingText: { color: COLORS.primary, fontWeight: 'bold', fontSize: FONTS.md, marginTop: 4 },
-  vehicleRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
-  vehicleIcon: { fontSize: 40 },
-  vehicleType: { fontSize: FONTS.lg, fontWeight: 'bold', color: COLORS.text, textTransform: 'capitalize' },
-  vehiclePlate: { color: COLORS.textSecondary, fontSize: FONTS.md },
-  vehicleCapacity: { color: COLORS.textSecondary, fontSize: FONTS.md },
-  statsRow: {
-    backgroundColor: COLORS.surface,
-    marginHorizontal: SPACING.md,
-    marginBottom: SPACING.md,
-    borderRadius: 12,
-    elevation: 2,
-    overflow: 'hidden',
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  statBox: { padding: SPACING.md, alignItems: 'center' },
-  statValue: { fontSize: FONTS.xxl, fontWeight: 'bold', color: COLORS.primary },
-  statLabel: { color: COLORS.textSecondary, fontSize: FONTS.sm, marginTop: 4 },
-  actions: { padding: SPACING.md },
-  actionBtn: { borderRadius: 8 },
+  cardHeaderTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.primary,
+    marginLeft: 6,
+  },
+  cardContent: {
+    gap: 8,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 2,
+  },
+  infoLabel: {
+    color: COLORS.textSecondary,
+    fontSize: 13,
+  },
+  infoValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  routeName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: 8,
+  },
+  noRouteText: {
+    color: COLORS.textSecondary,
+    fontStyle: 'italic',
+  },
+  logoutBtn: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 32,
+    backgroundColor: 'white',
+    borderWidth: 1.5,
+    borderColor: '#FEE2E2',
+    borderRadius: 12,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoutText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#DC2626',
+    marginLeft: 8,
+  },
 });
 
 export default DriverProfileScreen;

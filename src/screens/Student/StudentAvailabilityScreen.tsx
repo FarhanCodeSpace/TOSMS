@@ -22,7 +22,7 @@ import {
 } from 'firebase/firestore';
 import { useAuth } from '@hooks/useAuth';
 import { COLORS } from '@constants/theme';
-import { format, addDays } from 'date-fns';
+import { getPakistanTomorrowString, formatPakistanDate } from '@utils/dateHelpers';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { StudentHomeStackParamList } from '@navigation/types';
 
@@ -38,9 +38,8 @@ const StudentAvailabilityScreen: React.FC<StudentAvailabilityScreenProps> = ({ n
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  const tomorrow = addDays(new Date(), 1);
-  const tomorrowString = format(tomorrow, 'yyyy-MM-dd');
-  const tomorrowDisplay = format(tomorrow, "EEEE, MMMM d");
+  const tomorrowString = getPakistanTomorrowString();
+  const tomorrowDisplay = formatPakistanDate(tomorrowString);
 
   useEffect(() => {
     fetchCurrentAvailability();

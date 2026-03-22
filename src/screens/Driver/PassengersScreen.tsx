@@ -1,204 +1,315 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, FlatList, Linking, Animated, TouchableOpacity } from 'react-native';
-import { Text, Card, Searchbar, Chip } from 'react-native-paper';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, StyleSheet, FlatList, Animated, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { Text, Searchbar, Avatar } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Swipeable } from 'react-native-gesture-handler';
+import { Swipeable, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { db } from '@config/firebase';
 import { COLLECTIONS } from '@config/firebaseCollections';
-import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { COLORS, SPACING } from '@constants/theme';
-import { StackScreenProps } from '@react-navigation/stack';
-import { DriverActiveRideStackParamList } from '@navigation/types';
-import { Booking } from '@types';
+import { getPakistanTodayString } from '@utils/dateHelpers';
+import { Route, User, Availability } from '@types';
 
-type PassengersScreenProps = StackScreenProps<DriverActiveRideStackParamList, 'Passengers'>;
+interface StudentWithAvailability {
+  uid: string;
+  fullName: string;
+  pickupStop?: string;
+  availability: 'available' | 'unavailable' | 'no-response';
+  boarded: boolean;
+}
 
-export const PassengersScreen: React.FC<any> = ({ route }) => {
-  const { rideId } = route.params as { rideId: string };
-  
-  const [bookings, setBookings] = useState<Booking[]>([]);
+export const PassengersScreen: React.FC<any> = ({ route, navigation }) => {
+  const { routeId } = route.params as { routeId: string; rideId?: string };
+
+  const [routeData, setRouteData] = useState<Route | null>(null);
+  const [students, setStudents] = useState<StudentWithAvailability[]>([]);
+  const [availabilityMap, setAvailabilityMap] = useState<Record<string, any>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
+  const swipeableRefs = useRef<Record<string, Swipeable | null>>({});
+
+  const todayStr = getPakistanTodayString();
+
   useEffect(() => {
-    const q = query(
-      collection(db, COLLECTIONS.BOOKINGS),
-      where('rideId', '==', rideId)
-    );
+    const unsubscribers: (() => void)[] = [];
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedBookings: Booking[] = [];
-      snapshot.forEach((doc) => {
-        fetchedBookings.push({ bookingId: doc.id, ...doc.data() } as Booking);
-      });
-      // Sort so 'boarded' and 'completed' go to the bottom, active at top
-      fetchedBookings.sort((a, b) => {
-        if (a.status === 'boarded' && b.status !== 'boarded') return 1;
-        if (a.status !== 'boarded' && b.status === 'boarded') return -1;
-        return a.seatNumber - b.seatNumber;
-      });
-      setBookings(fetchedBookings);
-      setIsLoading(false);
-    });
+    const fetchData = async () => {
+      try {
+        const routeRef = doc(db, COLLECTIONS.ROUTES, routeId);
+        const routeSnap = await getDoc(routeRef);
+        if (!routeSnap.exists()) { setIsLoading(false); return; }
 
-    return () => unsubscribe();
-  }, [rideId]);
+        const rd = routeSnap.data() as Route;
+        setRouteData(rd);
+        const studentIds = rd.studentIds || [];
+        if (studentIds.length === 0) { setIsLoading(false); return; }
 
-  const handleBoarded = async (bookingId: string) => {
+        const studentDocs = await Promise.all(
+          studentIds.map((uid: string) => getDoc(doc(db, COLLECTIONS.USERS, uid)))
+        );
+        const studentList = studentDocs
+          .filter(d => d.exists())
+          .map(d => ({
+            uid: d.id,
+            fullName: (d.data() as any).fullName || 'Unknown',
+            pickupStop: (d.data() as any).pickupStop || 'Not assigned',
+            availability: 'no-response',
+            boarded: false,
+          } as StudentWithAvailability));
+        setStudents(studentList);
+
+        // Set up listeners OUTSIDE async, pushed to unsubscribers array
+        studentIds.forEach((uid: string) => {
+          const availDocId = uid + '_' + todayStr;
+          const unsub = onSnapshot(
+            doc(db, COLLECTIONS.AVAILABILITY, availDocId),
+            (snap) => {
+              setAvailabilityMap(prev => ({
+                ...prev,
+                [uid]: snap.exists() ? snap.data() : null
+              }));
+            }
+          );
+          unsubscribers.push(unsub);
+        });
+
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error:', error);
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+
+    // Cleanup runs correctly now
+    return () => {
+      unsubscribers.forEach(fn => fn());
+    };
+  }, [routeId, todayStr]);
+
+  const handleMarkBoarded = async (studentUid: string) => {
     try {
-      await updateDoc(doc(db, COLLECTIONS.BOOKINGS, bookingId), {
-        status: 'boarded'
-      });
+      const today = getPakistanTodayString();
+      const docId = studentUid + '_' + today;
+      const docRef = doc(db, COLLECTIONS.AVAILABILITY, docId);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        await updateDoc(docRef, {
+          boarded: true,
+          boardedAt: serverTimestamp()
+        });
+      } else {
+        await setDoc(docRef, {
+          userId: studentUid,
+          boarded: true,
+          boardedAt: serverTimestamp(),
+          date: today,
+          routeId: routeId || '',
+          isAvailable: true,
+          role: 'student'
+        });
+      }
+      console.log('Boarded marked for:', studentUid);
+      setTimeout(() => {
+        swipeableRefs.current[studentUid]?.close();
+      }, 300);
     } catch (error) {
-      console.error('Error updating booking status:', error);
+      console.error('Error marking boarded:', error);
     }
   };
 
-  const handleCall = (phone: string) => {
-    Linking.openURL(`tel:${phone}`);
+  const getInitials = (name: string) =>
+    name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+
+  const getAvailabilityBadge = (status: string) => {
+    switch (status) {
+      case 'available':
+        return { label: 'Available', color: '#16A34A', bg: '#F0FFF4' };
+      case 'unavailable':
+        return { label: 'Not Available', color: '#DC2626', bg: '#FFF0F0' };
+      default:
+        return { label: 'No Response', color: COLORS.textSecondary, bg: '#F3F4F6' };
+    }
   };
 
-  const filteredBookings = bookings.filter(b => 
-    b.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    b.seatNumber.toString().includes(searchQuery)
+  const filteredStudents = students.filter(s =>
+    s.fullName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const totalBooked = bookings.length;
-  // Normally we'd get total seats from ride doc, but it's not strictly passed in params so we'll just show boarded out of booked,
-  // or pass totalSeats in the future if needed. Showing boarded/booked counts.
-  const boardedCount = bookings.filter(b => b.status === 'boarded' || b.status === 'completed').length;
+  const boardedCount = students.filter(s =>
+    availabilityMap[s.uid]?.boarded === true
+  ).length;
+  
+  const availableCount = students.filter(s =>
+    availabilityMap[s.uid]?.isAvailable === true &&
+    !availabilityMap[s.uid]?.boarded
+  ).length;
+  
+  const unavailableCount = students.filter(s =>
+    availabilityMap[s.uid]?.isAvailable === false
+  ).length;
 
-  const renderRightActions = (progress: any, dragX: any, bookingId: string, currentStatus: string) => {
-    if (currentStatus === 'boarded' || currentStatus === 'completed' || currentStatus === 'cancelled') {
-        return null;
-    }
-    
-    const trans = dragX.interpolate({
-      inputRange: [-100, 0],
-      outputRange: [1, 0],
+  const renderRightActions = (
+    progress: Animated.AnimatedInterpolation<number>,
+    dragX: Animated.AnimatedInterpolation<number>,
+    uid: string
+  ) => {
+    if (availabilityMap[uid]?.boarded) return null;
+
+    const scale = progress.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0.8, 1],
+      extrapolate: 'clamp',
+    });
+
+    const opacity = progress.interpolate({
+      inputRange: [0, 0.5, 1],
+      outputRange: [0, 0.8, 1],
       extrapolate: 'clamp',
     });
 
     return (
-      <View style={styles.rightActionContainer}>
-        <Animated.Text
-          style={[
-            styles.actionText,
-            { transform: [{ translateX: trans }] },
-          ]}
-          onPress={() => handleBoarded(bookingId)}
-        >
-          Boarded ✓
-        </Animated.Text>
-      </View>
+      <Animated.View
+        style={{
+          opacity,
+          transform: [{ scale }],
+          backgroundColor: '#16A34A',
+          justifyContent: 'center',
+          alignItems: 'center',
+          width: 85,
+          marginVertical: 4,
+          marginLeft: 8,
+          borderRadius: 12,
+        }}
+      >
+        <MaterialCommunityIcons name="check-bold" size={24} color="white" />
+        <Text style={{ color: 'white', fontSize: 11, fontWeight: '700', marginTop: 4 }}>
+          Boarded
+        </Text>
+      </Animated.View>
     );
   };
 
-  const getStatusColor = (status: Booking['paymentStatus']) => {
-    switch (status) {
-      case 'paid': return COLORS.success;
-      case 'cash_pending': return COLORS.accent;
-      default: return COLORS.error;
-    }
-  };
-  
-  const getStatusLabel = (status: Booking['paymentStatus']) => {
-    switch (status) {
-      case 'paid': return 'Paid';
-      case 'cash_pending': return 'Cash on Pickup';
-      default: return 'Pending';
-    }
-  };
-
-  const renderItem = ({ item }: { item: Booking }) => {
-    const isBoarded = item.status === 'boarded' || item.status === 'completed';
+  const renderItem = ({ item }: { item: StudentWithAvailability }) => {
+    const isBoarded = availabilityMap[item.uid]?.boarded === true;
+    const isAvailable = availabilityMap[item.uid]?.isAvailable === true;
+    const isUnavailable = availabilityMap[item.uid]?.isAvailable === false;
+    
+    let badge = getAvailabilityBadge('no-response');
+    if (isAvailable) badge = getAvailabilityBadge('available');
+    if (isUnavailable) badge = getAvailabilityBadge('unavailable');
 
     return (
       <Swipeable
-        renderRightActions={(prog, drag) => renderRightActions(prog, drag, item.bookingId, item.status)}
-        enabled={!isBoarded && item.status !== 'cancelled'}
+        ref={(ref) => { swipeableRefs.current[item.uid] = ref; }}
+        friction={2}
+        leftThreshold={80}
+        rightThreshold={50}
+        overshootRight={false}
+        overshootFriction={8}
+        useNativeAnimations={true}
+        renderRightActions={(prog, drag) => renderRightActions(prog as Animated.AnimatedInterpolation<number>, drag as Animated.AnimatedInterpolation<number>, item.uid)}
+        enabled={!isBoarded && isAvailable}
+        onSwipeableOpen={(direction) => {
+          if (direction === 'right') {
+            handleMarkBoarded(item.uid);
+          }
+        }}
       >
-        <Card style={[styles.card, isBoarded && styles.cardBoarded]}>
-          <Card.Content style={styles.cardContent}>
-            <View style={[styles.seatBadge, isBoarded && styles.seatBadgeBoarded]}>
-              <Text style={styles.seatNumber}>{item.seatNumber}</Text>
+        <View style={[styles.studentCard, isBoarded && styles.studentCardBoarded]}>
+          <Avatar.Text
+            size={42}
+            label={getInitials(item.fullName)}
+            style={{ backgroundColor: isBoarded ? COLORS.success : COLORS.primary }}
+          />
+          <View style={styles.studentInfo}>
+            <Text style={styles.studentName} numberOfLines={1}>{item.fullName}</Text>
+            <View style={styles.pickupRow}>
+              <MaterialCommunityIcons name="map-marker" size={14} color={COLORS.textSecondary} />
+              <Text style={styles.pickupText}>{item.pickupStop}</Text>
             </View>
-
-            <View style={styles.infoContainer}>
-              <Text style={styles.studentName} numberOfLines={1}>{item.studentName}</Text>
-              <Text 
-                style={styles.phoneLink} 
-                onPress={() => handleCall(item.studentPhone)}
-              >
-                {item.studentPhone}
-              </Text>
-              <Text style={styles.pickupStop}>📍 {item.pickupStop}</Text>
-            </View>
-
-            <View style={styles.statusContainer}>
-              {isBoarded ? (
-                <Chip icon="check" style={styles.boardedChip} textStyle={{ color: 'white' }}>Boarded</Chip>
-              ) : (
-                <Chip 
-                  textStyle={{ color: 'white', fontSize: 10 }}
-                  style={[styles.paymentChip, { backgroundColor: getStatusColor(item.paymentStatus) }]}
-                >
-                  {getStatusLabel(item.paymentStatus)}
-                </Chip>
-              )}
-            </View>
-          </Card.Content>
-        </Card>
+          </View>
+          <View style={styles.statusContainer}>
+            {isBoarded ? (
+              <View style={[styles.badge, { backgroundColor: COLORS.success }]}>
+                <MaterialCommunityIcons name="check" size={12} color="white" />
+                <Text style={styles.badgeTextWhite}>Boarded</Text>
+              </View>
+            ) : (
+              <View style={[styles.badge, { backgroundColor: badge.bg }]}>
+                <Text style={[styles.badgeText, { color: badge.color }]}>{badge.label}</Text>
+              </View>
+            )}
+          </View>
+        </View>
       </Swipeable>
     );
   };
 
   return (
-    <View style={styles.container}>
-      {/* ── Floating Back Button ── */}
-      <TouchableOpacity 
-        style={styles.backButton} 
-        onPress={() => (route.params as any).navigation.goBack()}
-      >
-        <MaterialCommunityIcons name="chevron-left" size={28} color={COLORS.text} />
-      </TouchableOpacity>
+    <GestureHandlerRootView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <MaterialCommunityIcons name="chevron-left" size={28} color={COLORS.text} />
+        </TouchableOpacity>
+        <View style={styles.headerTextContainer}>
+          <Text style={styles.headerTitle}>Passengers</Text>
+          <Text style={styles.headerSubtitle}>
+            {routeData?.routeName || '...'} — {todayStr}
+          </Text>
+        </View>
+      </View>
 
-      {/* Header Card (No Money info!) */}
-      <Card style={styles.headerCard}>
-        <Card.Content style={styles.headerContent}>
-          <View style={styles.statBox}>
-            <Text style={styles.statLabel}>Boarded</Text>
-            <Text style={styles.statValue}>{boardedCount}</Text>
-          </View>
-          <View style={[styles.statBox, { borderLeftWidth: 1, borderLeftColor: '#E0E0E0' }]}>
-            <Text style={styles.statLabel}>Expected</Text>
-            <Text style={styles.statValue}>{totalBooked}</Text>
-          </View>
-        </Card.Content>
-      </Card>
+      {/* Summary Card */}
+      <View style={styles.summaryCard}>
+        <View style={styles.summaryItem}>
+          <Text style={[styles.summaryNumber, { color: '#16A34A' }]}>{availableCount}</Text>
+          <Text style={styles.summaryLabel}>Available</Text>
+        </View>
+        <View style={styles.summaryDivider} />
+        <View style={styles.summaryItem}>
+          <Text style={[styles.summaryNumber, { color: COLORS.primary }]}>{boardedCount}</Text>
+          <Text style={styles.summaryLabel}>Boarded</Text>
+        </View>
+        <View style={styles.summaryDivider} />
+        <View style={styles.summaryItem}>
+          <Text style={[styles.summaryNumber, { color: COLORS.textSecondary }]}>{unavailableCount}</Text>
+          <Text style={styles.summaryLabel}>Not Available</Text>
+        </View>
+      </View>
 
+      {/* Search Bar */}
       <Searchbar
-        placeholder="Search passenger or seat..."
+        placeholder="Search by name..."
         onChangeText={setSearchQuery}
         value={searchQuery}
         style={styles.searchbar}
         elevation={1}
       />
 
-      <FlatList
-        data={filteredBookings}
-        keyExtractor={(item) => item.bookingId}
-        renderItem={renderItem}
-        contentContainerStyle={styles.listContainer}
-        ListEmptyComponent={
-          !isLoading ? (
+      {/* Student List */}
+      {isLoading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={filteredStudents}
+          keyExtractor={(item) => item.uid}
+          renderItem={renderItem}
+          contentContainerStyle={styles.listContainer}
+          ListEmptyComponent={
             <View style={styles.emptyContainer}>
+              <MaterialCommunityIcons name="account-off" size={48} color={COLORS.textSecondary} style={{ opacity: 0.3 }} />
               <Text style={styles.emptyText}>No passengers found</Text>
             </View>
-          ) : null
-        }
-      />
-    </View>
+          }
+        />
+      )}
+    </GestureHandlerRootView>
   );
 };
 
@@ -206,131 +317,153 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-    paddingTop: 50,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'white',
-    justifyContent: 'center',
+  header: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: SPACING.md,
-    marginBottom: SPACING.sm,
+    paddingTop: 50,
+    paddingHorizontal: SPACING.md,
+    paddingBottom: SPACING.sm,
+    backgroundColor: 'white',
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
-  headerCard: {
-    margin: SPACING.md,
-    backgroundColor: COLORS.surface,
-    elevation: 3,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: SPACING.sm,
-  },
-  statBox: {
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
     alignItems: 'center',
+    marginRight: SPACING.sm,
+  },
+  headerTextContainer: {
     flex: 1,
   },
-  statLabel: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    marginBottom: 4,
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: COLORS.text,
   },
-  statValue: {
+  headerSubtitle: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  summaryCard: {
+    flexDirection: 'row',
+    backgroundColor: 'white',
+    margin: SPACING.md,
+    borderRadius: 12,
+    padding: SPACING.md,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  summaryItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  summaryNumber: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: COLORS.primary,
+  },
+  summaryLabel: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    marginTop: 4,
+  },
+  summaryDivider: {
+    width: 1,
+    backgroundColor: '#E5E7EB',
   },
   searchbar: {
     marginHorizontal: SPACING.md,
     marginBottom: SPACING.md,
-    backgroundColor: COLORS.surface,
+    backgroundColor: 'white',
   },
   listContainer: {
     paddingHorizontal: SPACING.md,
     paddingBottom: SPACING.xl,
   },
-  card: {
-    marginBottom: SPACING.md,
-    backgroundColor: COLORS.surface,
-    elevation: 2,
-  },
-  cardBoarded: {
-    backgroundColor: '#F5F5F5',
-    opacity: 0.8,
-  },
-  cardContent: {
+  studentCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: SPACING.sm,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
   },
-  seatBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: SPACING.md,
+  studentCardBoarded: {
+    backgroundColor: '#F9FAFB',
+    opacity: 0.8,
   },
-  seatBadgeBoarded: {
-    backgroundColor: COLORS.success,
-  },
-  seatNumber: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  infoContainer: {
+  studentInfo: {
     flex: 1,
+    marginLeft: 12,
   },
   studentName: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 15,
+    fontWeight: '600',
     color: COLORS.text,
-    marginBottom: 4,
   },
-  phoneLink: {
-    fontSize: 14,
-    color: COLORS.primary,
-    textDecorationLine: 'underline',
-    marginBottom: 4,
+  pickupRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
   },
-  pickupStop: {
+  pickupText: {
     fontSize: 12,
     color: COLORS.textSecondary,
   },
   statusContainer: {
-    alignItems: 'flex-end',
-    justifyContent: 'center',
     marginLeft: SPACING.sm,
   },
-  paymentChip: {
-    height: 28,
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    gap: 4,
   },
-  boardedChip: {
-    backgroundColor: COLORS.success,
-    height: 32,
+  badgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  badgeTextWhite: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: 'white',
   },
   rightActionContainer: {
     justifyContent: 'center',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     backgroundColor: COLORS.success,
-    marginBottom: SPACING.md,
-    borderRadius: 8,
-    flex: 1,
+    marginBottom: SPACING.sm,
+    borderRadius: 12,
+    width: 100,
+  },
+  boardedActionContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   actionText: {
     color: 'white',
     fontWeight: 'bold',
-    paddingHorizontal: 20,
-    paddingVertical: 30,
-    fontSize: 16, 
+    fontSize: 12,
+    marginTop: 4,
   },
   emptyContainer: {
     padding: SPACING.xl,
@@ -339,7 +472,8 @@ const styles = StyleSheet.create({
   emptyText: {
     color: COLORS.textSecondary,
     fontSize: 16,
-  }
+    marginTop: 8,
+  },
 });
 
 export default PassengersScreen;

@@ -2,6 +2,7 @@ import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createStackNavigator } from "@react-navigation/stack";
 import { MaterialCommunityIcons as Icon } from "@expo/vector-icons";
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   DriverTabParamList,
   DriverHomeStackParamList,
@@ -11,20 +12,19 @@ import {
 } from "./types";
 import {
   DriverHomeScreen,
-  CreateRideScreen,
   ActiveRideScreen,
   PassengersScreen,
   RideSummaryScreen,
   DriverProfileScreen,
   DriverAvailabilityScreen,
   DriverMyRouteScreen,
+  TodayStudentsScreen,
 } from "@screens/Driver";
 import { COLORS } from "@constants/theme";
 
 const Tab = createBottomTabNavigator<DriverTabParamList>();
 const HomeStack = createStackNavigator<DriverHomeStackParamList>();
 const ActiveRideStack = createStackNavigator<DriverActiveRideStackParamList>();
-const ProfileStack = createStackNavigator<DriverProfileStackParamList>();
 const MyRouteStack = createStackNavigator<DriverMyRouteStackParamList>();
 
 const HomeStackNavigator = () => (
@@ -35,26 +35,36 @@ const HomeStackNavigator = () => (
       options={{ title: "Home" }}
     />
     <HomeStack.Screen
-      name="CreateRide"
-      component={CreateRideScreen}
-      options={{ title: "Create Ride" }}
-    />
-    <HomeStack.Screen
       name="DriverAvailability"
       component={DriverAvailabilityScreen}
       options={{ title: "Availability" }}
     />
-  </HomeStack.Navigator>
-);
-
-const MyRouteStackNavigator = () => (
-  <MyRouteStack.Navigator screenOptions={{ headerShown: false }}>
-    <MyRouteStack.Screen
-      name="DriverMyRoute"
-      component={DriverMyRouteScreen}
-      options={{ title: "My Route" }}
+    <HomeStack.Screen
+      name="ActiveRide"
+      component={ActiveRideScreen}
+      options={{ title: "Active Ride" }}
     />
-  </MyRouteStack.Navigator>
+    <HomeStack.Screen
+      name="Passengers"
+      component={PassengersScreen}
+      options={{ title: "Passengers" }}
+    />
+    <HomeStack.Screen
+      name="RideSummary"
+      component={RideSummaryScreen}
+      options={{ title: "Ride Summary" }}
+    />
+    <HomeStack.Screen
+      name="TodayStudents"
+      component={TodayStudentsScreen}
+      options={{ title: "Today's Students" }}
+    />
+    <HomeStack.Screen
+      name="DriverProfile"
+      component={DriverProfileScreen}
+      options={{ title: "Profile", headerShown: true }}
+    />
+  </HomeStack.Navigator>
 );
 
 const ActiveRideStackNavigator = () => (
@@ -77,29 +87,30 @@ const ActiveRideStackNavigator = () => (
   </ActiveRideStack.Navigator>
 );
 
-const ProfileStackNavigator = () => (
-  <ProfileStack.Navigator screenOptions={{ headerShown: false }}>
-    <ProfileStack.Screen
-      name="DriverProfile"
-      component={DriverProfileScreen}
-      options={{ title: "Profile" }}
-    />
-  </ProfileStack.Navigator>
-);
-
 export const DriverNavigator = () => {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: COLORS.primary,
-        tabBarInactiveTintColor: "gray",
+        tabBarInactiveTintColor: "#9CA3AF",
+        tabBarStyle: {
+          backgroundColor: 'white',
+          borderTopWidth: 1,
+          borderTopColor: '#F0F0F0',
+          height: 60 + insets.bottom,
+          paddingBottom: 8 + insets.bottom,
+          paddingTop: 8,
+        },
         tabBarIcon: ({ color, size }) => {
-          let iconName = "home";
-          if (route.name === "HomeTab") iconName = "home";
-          else if (route.name === "MyRouteTab") iconName = "map-marker";
-          else if (route.name === "ActiveRideTab") iconName = "play-circle";
-          else if (route.name === "ProfileTab") iconName = "account";
+          let iconName: any = "home";
+          if (route.name === "HomeTab") iconName = "home-variant";
+          else if (route.name === "MyRouteTab") iconName = "map-marker-path";
+          else if (route.name === "ActiveRideTab") iconName = "play-circle-outline";
+          else if (route.name === "StudentsTab") iconName = "account-group";
+          else if (route.name === "ProfileTab") iconName = "account-circle-outline";
           return <Icon name={iconName} size={size} color={color} />;
         },
       })}
@@ -111,17 +122,22 @@ export const DriverNavigator = () => {
       />
       <Tab.Screen
         name="MyRouteTab"
-        component={MyRouteStackNavigator}
+        component={DriverMyRouteScreen}
         options={{ tabBarLabel: "My Route" }}
       />
       <Tab.Screen
         name="ActiveRideTab"
         component={ActiveRideStackNavigator}
-        options={{ tabBarLabel: "Active Ride" }}
+        options={{ tabBarLabel: "Active" }}
+      />
+      <Tab.Screen
+        name="StudentsTab"
+        component={TodayStudentsScreen}
+        options={{ tabBarLabel: "Students" }}
       />
       <Tab.Screen
         name="ProfileTab"
-        component={ProfileStackNavigator}
+        component={DriverProfileScreen}
         options={{ tabBarLabel: "Profile" }}
       />
     </Tab.Navigator>

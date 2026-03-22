@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { Text, Button, Card } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { db } from '@config/firebase';
 import { COLLECTIONS } from '@config/firebaseCollections';
 import { doc, getDoc } from 'firebase/firestore';
@@ -57,17 +58,14 @@ export const RideSummaryScreen: React.FC<any> = ({ route, navigation }) => {
     );
   }
 
-  // Calculate actual boarded based on seatMap statuses (completed bindings)
-  const boardedCount = Object.values(ride.seatMap || {}).filter(
-    (seat: any) => seat.status === 'booked' 
-  ).length;
+  const boardedCount = ride.boardedCount !== undefined ? ride.boardedCount : (ride.completedStudentIds?.length || 0);
 
-  const dateStr = ride.departureTime ? format(ride.departureTime.toDate(), 'PPP') : 'Unknown Date';
+  const dateStr = ride.date ? format(new Date(ride.date), 'MMM d, yyyy') : String(ride.departureTime || '--');
 
   return (
     <View style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.checkIcon}>✅</Text>
+        <MaterialCommunityIcons name="check-circle-outline" size={80} color={COLORS.success} />
         <Text style={styles.title}>Ride Completed!</Text>
         <Text style={styles.subtitle}>Great job for the day.</Text>
 
@@ -122,10 +120,7 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingBottom: SPACING.xl * 2,
   },
-  checkIcon: {
-    fontSize: 80,
-    marginBottom: SPACING.lg,
-  },
+
   title: {
     fontSize: 28,
     fontWeight: 'bold',

@@ -1,5 +1,5 @@
 export type AuthStackParamList = {
-  Login: undefined;
+  Login: { successMessage?: string; email?: string } | undefined;
   Register: undefined;
   ForgotPassword: undefined;
   DriverProfileSetup: undefined;

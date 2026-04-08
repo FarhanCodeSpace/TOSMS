@@ -7,6 +7,10 @@ import {
   Alert,
   ActivityIndicator,
   Image,
+  Platform,
+  Keyboard,
+  Pressable,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { Text, Button, TextInput } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
@@ -81,82 +85,97 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation
   const avatarSource = newImageUri || currentUser?.profileImageUrl;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* ── Floating Back Button ── */}
-      <TouchableOpacity 
-        style={styles.backButton} 
-        onPress={() => navigation.goBack()}
+    <Pressable 
+      style={styles.container} 
+      onPress={Keyboard.dismiss}
+      accessible={false}
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
       >
-        <MaterialCommunityIcons name="chevron-left" size={28} color={COLORS.text} />
-      </TouchableOpacity>
-
-      {/* Avatar Picker */}
-      <View style={styles.avatarSection}>
-        <TouchableOpacity onPress={handlePickImage}>
-          {avatarSource ? (
-            <Image source={{ uri: avatarSource }} style={styles.avatar} />
-          ) : (
-            <View style={styles.avatarFallback}>
-              <Text style={styles.avatarInitials}>
-                {getInitials(currentUser?.fullName || '')}
-              </Text>
-            </View>
-          )}
-          <View style={styles.editBadge}>
-            <Text style={styles.editBadgeText}>📷</Text>
-          </View>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+        {/* ── Floating Back Button ── */}
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={() => navigation.goBack()}
+        >
+          <MaterialCommunityIcons name="chevron-left" size={28} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.changePhotoText}>Tap to change photo</Text>
-      </View>
 
-      {/* Form Fields */}
-      <TextInput
-        label="Full Name"
-        value={fullName}
-        onChangeText={setFullName}
-        mode="outlined"
-        style={styles.input}
-        outlineColor={COLORS.primary}
-        activeOutlineColor={COLORS.primary}
-      />
+        {/* Avatar Picker */}
+        <View style={styles.avatarSection}>
+          <TouchableOpacity onPress={handlePickImage}>
+            {avatarSource ? (
+              <Image source={{ uri: avatarSource }} style={styles.avatar} />
+            ) : (
+              <View style={styles.avatarFallback}>
+                <Text style={styles.avatarInitials}>
+                  {getInitials(currentUser?.fullName || '')}
+                </Text>
+              </View>
+            )}
+            <View style={styles.editBadge}>
+              <Text style={styles.editBadgeText}>📷</Text>
+            </View>
+          </TouchableOpacity>
+          <Text style={styles.changePhotoText}>Tap to change photo</Text>
+        </View>
 
-      <TextInput
-        label="Phone Number"
-        value={phone}
-        onChangeText={setPhone}
-        mode="outlined"
-        style={styles.input}
-        keyboardType="phone-pad"
-        outlineColor={COLORS.primary}
-        activeOutlineColor={COLORS.primary}
-      />
+        {/* Form Fields */}
+        <TextInput
+          label="Full Name"
+          value={fullName}
+          onChangeText={setFullName}
+          mode="outlined"
+          style={styles.input}
+          outlineColor={COLORS.primary}
+          activeOutlineColor={COLORS.primary}
+        />
 
-      <TextInput
-        label="Email"
-        value={currentUser?.email || ''}
-        mode="outlined"
-        style={styles.input}
-        disabled
-        outlineColor={COLORS.primary}
-      />
+        <TextInput
+          label="Phone Number"
+          value={phone}
+          onChangeText={setPhone}
+          mode="outlined"
+          style={styles.input}
+          keyboardType="phone-pad"
+          outlineColor={COLORS.primary}
+          activeOutlineColor={COLORS.primary}
+        />
 
-      <Button
-        mode="contained"
-        buttonColor={COLORS.primary}
-        style={styles.saveBtn}
-        loading={isSaving}
-        disabled={isSaving}
-        onPress={handleSave}
-      >
-        Save Changes
-      </Button>
-    </ScrollView>
+        <TextInput
+          label="Email"
+          value={currentUser?.email || ''}
+          mode="outlined"
+          style={styles.input}
+          disabled
+          outlineColor={COLORS.primary}
+        />
+
+        <Button
+          mode="contained"
+          buttonColor={COLORS.primary}
+          style={styles.saveBtn}
+          loading={isSaving}
+          disabled={isSaving}
+          onPress={handleSave}
+        >
+          Save Changes
+        </Button>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </Pressable>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  content: { padding: SPACING.md, paddingTop: 60, paddingBottom: SPACING.xl },
+  content: { padding: SPACING.md, paddingTop: 60, paddingBottom: 10 },
   backButton: {
     width: 40,
     height: 40,

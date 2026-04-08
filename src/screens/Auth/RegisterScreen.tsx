@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Platform, KeyboardAvoidingView, ScrollView } from "react-native";
 import { TextInput, Button, Text, HelperText } from "react-native-paper";
 import { useAuth } from "@hooks/useAuth";
 import { COLORS, SPACING } from "@constants/theme";
@@ -57,6 +57,10 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
 
     try {
       await register(email, password, fullName, phone, role);
+      navigation.navigate("Login", { 
+        successMessage: "Account created successfully! Please login to continue.",
+        email: email
+      });
     } catch (err: any) {
       console.error("Registration error:", err.code);
       switch (err.code) {
@@ -78,7 +82,15 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1, backgroundColor: COLORS.background }}
+    >
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
       <View style={styles.header}>
         <View style={styles.logoContainer}>
           <MaterialCommunityIcons name="bus-clock" size={40} color="white" />
@@ -238,7 +250,8 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
           </TouchableOpacity>
         </View>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -248,6 +261,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     padding: SPACING.lg,
     paddingTop: SPACING.xl,
+    paddingBottom: 10,
   },
   header: {
     alignItems: "center",

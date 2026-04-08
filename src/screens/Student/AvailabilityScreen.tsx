@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { Text, TextInput, Button, Card } from 'react-native-paper';
 import { db } from '@config/firebase';
@@ -181,7 +183,15 @@ export const AvailabilityScreen: React.FC<AvailabilityScreenProps> = ({ navigati
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1, backgroundColor: COLORS.background }}
+    >
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
       <Text style={styles.title}>Mark Your Availability</Text>
       <Text style={styles.subtitle}>Let admin know if you need transport tomorrow</Text>
       
@@ -248,13 +258,14 @@ export const AvailabilityScreen: React.FC<AvailabilityScreenProps> = ({ navigati
       <Text style={styles.reminderText}>
         Please mark your availability before 10:00 PM each night.
       </Text>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  content: { padding: SPACING.lg },
+  content: { padding: SPACING.lg, paddingBottom: 10 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   title: { fontSize: FONTS.xxl, fontWeight: 'bold', color: COLORS.primary, marginBottom: SPACING.xs },
   subtitle: { fontSize: FONTS.md, color: COLORS.textSecondary, marginBottom: SPACING.xl },

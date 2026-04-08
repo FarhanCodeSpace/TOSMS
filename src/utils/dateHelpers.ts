@@ -1,3 +1,5 @@
+import { format } from 'date-fns';
+
 export const getPakistanTodayString = (): string => {
   const now = new Date();
   const pakistanTime = new Date(now.getTime() + (5 * 60 * 60 * 1000));
@@ -12,11 +14,13 @@ export const getPakistanTomorrowString = (): string => {
 };
 
 export const formatPakistanDate = (dateString: string): string => {
-  const date = new Date(dateString + 'T00:00:00+05:00');
-  return date.toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
+  try {
+    const [year, month, day] = dateString.substring(0, 10).split('-');
+    if (!year || !month || !day) return dateString;
+
+    const date = new Date(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10));
+    return format(date, 'EEEE, MMMM d, yyyy');
+  } catch (error) {
+    return dateString; // Fallback in case of an unexpected parsing error
+  }
 };

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, KeyboardAvoidingView } from 'react-native';
 import { TextInput, Button, Text, Card, IconButton, HelperText, useTheme } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import MapView, { Marker, MarkerDragStartEndEvent } from 'react-native-maps';
@@ -226,7 +226,15 @@ const CreateRideScreen: React.FC<CreateRideScreenProps> = ({ navigation }) => {
   );
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1, backgroundColor: COLORS.background }}
+    >
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
       {/* ── Floating Back Button ── */}
       <TouchableOpacity 
         style={styles.backButton} 
@@ -247,12 +255,18 @@ const CreateRideScreen: React.FC<CreateRideScreenProps> = ({ navigation }) => {
       {step === 1 && renderStep1()}
       {step === 2 && renderStep2()}
       {step === 3 && renderStep3()}
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { padding: SPACING.md, paddingTop: 60, backgroundColor: COLORS.background },
+  container: { 
+    padding: SPACING.md, 
+    paddingTop: 60, 
+    paddingBottom: 10,
+    backgroundColor: COLORS.background 
+  },
   backButton: {
     width: 40,
     height: 40,

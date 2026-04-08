@@ -4,6 +4,7 @@ import React, {
   useEffect,
   useCallback,
   ReactNode,
+  useRef,
 } from "react";
 import {
   onAuthStateChanged,
@@ -43,6 +44,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const isRegistering = useRef(false);
 
   // Persistence: Save to AsyncStorage
   const saveUserToStorage = useCallback(async (user: User | null) => {
@@ -105,6 +107,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     const unsubscribe = onAuthStateChanged(
       auth,
       async (firebaseUser: FirebaseUser | null) => {
+        if (isRegistering.current) {
+          return; // Ignore auth state changes during registration to avoid flashing the dashboard
+        }
+
         setIsLoading(true);
         if (firebaseUser) {
           try {
@@ -139,6 +145,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     phone: string,
     role: "student" | "driver",
   ) => {
+    isRegistering.current = true;
     try {
       const userCredential = await createUserWithEmailAndPassword(
         auth,
@@ -169,10 +176,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       };
 
       await setDoc(doc(db, COLLECTIONS.USERS, uid), newUser);
-      setCurrentUser(newUser);
-      await saveUserToStorage(newUser);
+      // Ensure user is signed out so they have to login manually
+      await signOut(auth);
+      // We do NOT set current user or save to storage here
     } catch (error) {
       throw error;
+    } finally {
+      // Re-enable auth state listening after a short delay
+      // to ensure the automatic sign-in event from Firebase is entirely ignored
+      setTimeout(() => {
+        isRegistering.current = false;
+      }, 1000);
     }
   };
 

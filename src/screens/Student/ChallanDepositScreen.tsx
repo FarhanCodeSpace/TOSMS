@@ -8,6 +8,8 @@ import {
   ActivityIndicator,
   Image,
   TextInput,
+  Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { Text, Button } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
@@ -134,7 +136,15 @@ const ChallanDepositScreen: React.FC<ChallanDepositScreenProps> = ({ navigation,
         <Text style={styles.headerTitle}>Submit Deposit Proof</Text>
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.scroll}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
         {/* Instructions */}
         <View style={styles.instructionsCard}>
           <Icon name="information-outline" size={20} color={COLORS.primary} style={{ marginTop: 2 }} />
@@ -180,7 +190,8 @@ const ChallanDepositScreen: React.FC<ChallanDepositScreenProps> = ({ navigation,
             <Text style={styles.submitBtnText}>Submit Proof</Text>
           )}
         </TouchableOpacity>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 };
@@ -198,7 +209,7 @@ const styles = StyleSheet.create({
   backBtn: { marginRight: 16 },
   headerTitle: { fontSize: 18, fontWeight: '700', color: '#FFF' },
   scroll: { flex: 1 },
-  scrollContent: { padding: 16, paddingBottom: 40 },
+  scrollContent: { padding: 16, paddingBottom: 10 },
   instructionsCard: {
     backgroundColor: '#F0F4FF',
     borderRadius: 8,

@@ -6,7 +6,11 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Platform,
+  Keyboard,
+  Pressable,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { Text, TextInput, Button, Switch } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { db } from '@config/firebase';
@@ -115,8 +119,20 @@ const DriverAvailabilityScreen: React.FC<DriverAvailabilityScreenProps> = ({ nav
   }
 
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+    <Pressable 
+      style={styles.container} 
+      onPress={Keyboard.dismiss}
+      accessible={false}
+    >
+      <KeyboardAwareScrollView 
+        enableOnAndroid={true}
+        extraHeight={120}
+        extraScrollHeight={0}
+        contentContainerStyle={styles.scrollContent} 
+        keyboardShouldPersistTaps="handled"
+        viewIsInsideTabBar={true}
+        enableAutomaticScroll={true}
+      >
         {/* ── Back Button ── */}
         <TouchableOpacity 
           style={styles.backButton} 
@@ -210,23 +226,23 @@ const DriverAvailabilityScreen: React.FC<DriverAvailabilityScreenProps> = ({ nav
             activeOutlineColor={COLORS.primary}
           />
         </View>
-      </ScrollView>
 
-      {/* ── Action Button ── */}
-      <View style={styles.footer}>
-        <Button
-          mode="contained"
-          onPress={handleConfirm}
-          loading={isSaving}
-          disabled={isSaving || isAvailable === null}
-          style={styles.confirmBtn}
-          contentStyle={styles.confirmBtnContent}
-          buttonColor={COLORS.primary}
-        >
-          Confirm Availability
-        </Button>
-      </View>
-    </View>
+        {/* ── Action Button ── */}
+        <View style={styles.footer}>
+          <Button
+            mode="contained"
+            onPress={handleConfirm}
+            loading={isSaving}
+            disabled={isSaving || isAvailable === null}
+            style={styles.confirmBtn}
+            contentStyle={styles.confirmBtnContent}
+            buttonColor={COLORS.primary}
+          >
+            Confirm Availability
+          </Button>
+        </View>
+        </KeyboardAwareScrollView>
+    </Pressable>
   );
 };
 
@@ -237,8 +253,8 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
-    paddingTop: 60,
-    paddingBottom: 100,
+    paddingTop: 10,
+    paddingBottom: 10,
   },
   backButton: {
     width: 40,
@@ -385,15 +401,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
   },
   footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'white',
-    padding: 20,
-    paddingBottom: 30,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    backgroundColor: 'transparent',
+    marginTop: 24,
+    marginBottom: 20,
   },
   confirmBtn: {
     borderRadius: 12,

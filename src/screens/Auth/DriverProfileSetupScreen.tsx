@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
+  Platform,
+  KeyboardAvoidingView,
 } from "react-native";
 import {
   TextInput,
@@ -128,7 +130,15 @@ const DriverProfileSetupScreen: React.FC<DriverProfileSetupScreenProps> = ({
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1, backgroundColor: COLORS.background }}
+    >
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
       <Text style={styles.title}>Complete Your Profile</Text>
       <Text style={styles.subtitle}>
         Fill in your details to start as a driver
@@ -211,7 +221,8 @@ const DriverProfileSetupScreen: React.FC<DriverProfileSetupScreenProps> = ({
           Submit Profile
         </Button>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -220,6 +231,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     backgroundColor: COLORS.background,
     padding: SPACING.lg,
+    paddingBottom: 10,
     alignItems: "center",
     paddingTop: SPACING.xl,
   },

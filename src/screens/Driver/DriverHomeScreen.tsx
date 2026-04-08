@@ -56,8 +56,10 @@ const DriverHomeScreen: React.FC<DriverHomeScreenProps> = ({ navigation }) => {
           setDriverAvailabilityDoc(null);
         }
       },
-      (error) => {
-        console.error('Availability listener error:', error);
+      (error: any) => {
+        if (error.code !== 'permission-denied') {
+          console.error('Availability listener error:', error);
+        }
         setDriverAvailabilityDoc(null);
       }
     );
@@ -134,8 +136,10 @@ const DriverHomeScreen: React.FC<DriverHomeScreenProps> = ({ navigation }) => {
             console.log('Found ride:', found);
             setTodayRide(found);
             setRideLoading(false);
-          }, (err) => {
-            console.error('Ride listener error:', err);
+          }, (err: any) => {
+            if (err.code !== 'permission-denied') {
+              console.error('Ride listener error:', err);
+            }
             setRideLoading(false);
           });
           cleanups.push(unsubRides);

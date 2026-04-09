@@ -11,6 +11,7 @@ import {
 } from "./types";
 import {
   StudentHomeScreen,
+  ReviewScreen,
   RideHistoryScreen,
   TrackRideScreen,
   StudentProfileScreen,
@@ -21,7 +22,7 @@ import {
   FeePaymentScreen,
   ChallanViewScreen,
   ChallanDepositScreen,
-  PaymentHistoryScreen
+  PaymentHistoryScreen,
 } from "@screens/Student/StudentScreens";
 import { COLORS } from "@constants/theme";
 
@@ -73,6 +74,11 @@ const HomeStackNavigator = () => (
       component={TrackRideScreen}
       options={{ title: "Track Ride" }}
     />
+    <HomeStack.Screen
+      name="Review"
+      component={ReviewScreen}
+      options={{ headerShown: false }}
+    />
   </HomeStack.Navigator>
 );
 
@@ -97,6 +103,11 @@ const RidesStackNavigator = () => (
       name="TrackRide"
       component={TrackRideScreen}
       options={{ title: "Track Ride" }}
+    />
+    <RidesStack.Screen
+      name="Review"
+      component={ReviewScreen}
+      options={{ headerShown: false }}
     />
   </RidesStack.Navigator>
 );

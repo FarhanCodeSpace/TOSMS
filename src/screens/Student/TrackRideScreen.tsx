@@ -1,449 +1,694 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   StyleSheet,
   Animated,
   TouchableOpacity,
   Linking,
+  Dimensions,
+  Platform,
   Alert,
-} from 'react-native';
-import { Text, Button } from 'react-native-paper';
-import MapView, { Marker, Polyline } from 'react-native-maps';
-import * as Location from 'expo-location';
-import { db } from '@config/firebase';
-import { COLLECTIONS } from '@config/firebaseCollections';
-import { doc, onSnapshot, getDoc } from 'firebase/firestore';
-import { useAuth } from '@hooks/useAuth';
-import { COLORS, SPACING, FONTS } from '@constants/theme';
-import { StackScreenProps } from '@react-navigation/stack';
-import { StudentRidesStackParamList } from '@navigation/types';
-import { CommonActions } from '@react-navigation/native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+} from "react-native";
+import { Text, Avatar, ActivityIndicator, Button } from "react-native-paper";
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
+import * as Location from "expo-location";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { db } from "@config/firebase";
+import { COLLECTIONS } from "@config/firebaseCollections";
+import { doc, getDoc, onSnapshot } from "firebase/firestore";
+import { useAuth } from "@hooks/useAuth";
+import { COLORS, SPACING, FONTS } from "@constants/theme";
+import { StackScreenProps } from "@react-navigation/stack";
+import { StudentHomeStackParamList } from "@navigation/types";
+import { CommonActions } from "@react-navigation/native";
+import { Ride, Route, LiveLocation, User } from "@types";
 
-type TrackRideScreenProps = StackScreenProps<StudentRidesStackParamList, 'TrackRide'>;
+type TrackRideScreenProps = StackScreenProps<
+  StudentHomeStackParamList,
+  "TrackRide"
+>;
 
-interface RideInfo {
-  routeName: string;
-  driverName: string;
-  driverPhone: string;
-  vehiclePlate: string;
-  status: 'scheduled' | 'active' | 'completed';
-  stops: { stopName: string; order: number }[];
-  startLocation: { name: string; latitude: number; longitude: number };
-  endLocation: { name: string; latitude: number; longitude: number };
-}
+const { width, height } = Dimensions.get("window");
 
-interface LiveLocation {
-  latitude: number;
-  longitude: number;
-  heading?: number;
-  speed?: number;
-}
+// Helper function for distance calculation
+const calculateDistance = (
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
+) => {
+  const R = 6371e3; // metres
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
 
-export const TrackRideScreen: React.FC<TrackRideScreenProps> = ({ route, navigation }) => {
+  const a =
+    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c; // in metres
+};
+
+export const TrackRideScreen: React.FC<TrackRideScreenProps> = ({
+  route,
+  navigation,
+}) => {
   const { rideId } = route.params;
   const { currentUser } = useAuth();
 
-  const [rideInfo, setRideInfo] = useState<RideInfo | null>(null);
-  const [liveLocation, setLiveLocation] = useState<LiveLocation | null>(null);
-  const [studentLocation, setStudentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [rideStatus, setRideStatus] = useState<'scheduled' | 'active' | 'completed'>('scheduled');
+  // Ride Data State
+  const [ride, setRide] = useState<Ride | null>(null);
+  const [routeData, setRouteData] = useState<Route | null>(null);
+  const [driverData, setDriverData] = useState<User | null>(null);
+  const [driverLocation, setDriverLocation] = useState<LiveLocation | null>(
+    null,
+  );
+  const [studentLocation, setStudentLocation] =
+    useState<Location.LocationObject | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [currentStopIndex, setCurrentStopIndex] = useState(0);
 
-  // For smooth animation of driver marker
-  const animatedLat = useRef(new Animated.Value(0)).current;
-  const animatedLng = useRef(new Animated.Value(0)).current;
-  const prevCoordRef = useRef<LiveLocation | null>(null);
-
-  // Pulsing banner animation
+  // Animation Refs
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const dotPulseAnim = useRef(new Animated.Value(1)).current;
+  const driverMarkerLat = useRef(new Animated.Value(0)).current;
+  const driverMarkerLng = useRef(new Animated.Value(0)).current;
+  const prevCoord = useRef<{ latitude: number; longitude: number } | null>(
+    null,
+  );
 
+  // ── ON MOUNT: INITIAL FETCH ──
   useEffect(() => {
-    // Pulsing animation for waiting banner
+    const fetchData = async () => {
+      try {
+        // 1. Fetch ride document
+        const rideRef = doc(db, COLLECTIONS.RIDES, rideId);
+        const rideSnap = await getDoc(rideRef);
+
+        if (rideSnap.exists()) {
+          const rideData = rideSnap.data() as Ride;
+          setRide(rideData);
+
+          // 2. Fetch route document if routeId exists
+          if (rideData.routeId) {
+            const routeRef = doc(db, COLLECTIONS.ROUTES, rideData.routeId);
+            const routeSnap = await getDoc(routeRef);
+            if (routeSnap.exists()) {
+              const rData = routeSnap.data() as Route;
+              setRouteData(rData);
+            }
+          }
+        }
+
+        // 3. Get student location (Safe check)
+        try {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status === "granted") {
+            const location = await Location.getCurrentPositionAsync({});
+            setStudentLocation(location);
+          }
+        } catch (e) {
+          console.warn("Could not get student location:", e);
+        }
+      } catch (error) {
+        console.error("Error initializing tracking:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+
+    // 4. Start pulsing animations
     Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 0.4, duration: 800, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
-      ])
+        Animated.timing(pulseAnim, {
+          toValue: 0.4,
+          duration: 750,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 750,
+          useNativeDriver: true,
+        }),
+      ]),
     ).start();
-  }, []);
 
-  useEffect(() => {
-    const init = async () => {
-      // Fetch ride info
-      try {
-        const snap = await getDoc(doc(db, COLLECTIONS.RIDES, rideId));
-        if (snap.exists()) {
-          const data = snap.data() as RideInfo;
-          setRideInfo(data);
-          setRideStatus(data.status);
-        }
-      } catch (e) {
-        console.error('Error fetching ride info:', e);
-      }
-
-      // Get student's current location
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status === 'granted') {
-          const loc = await Location.getCurrentPositionAsync({});
-          setStudentLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
-        }
-      } catch (e) {
-        console.error('Error getting student location:', e);
-      }
-    };
-    init();
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(dotPulseAnim, {
+          toValue: 0.3,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(dotPulseAnim, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
   }, [rideId]);
 
-  // Listen to live location updates
+  // ── FETCH DRIVER DATA ──
   useEffect(() => {
-    const unsubLive = onSnapshot(doc(db, COLLECTIONS.LIVE_LOCATIONS, rideId), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data() as LiveLocation;
-        setLiveLocation(data);
-
-        // Animate marker smoothly
-        if (prevCoordRef.current) {
-          animatedLat.setValue(prevCoordRef.current.latitude);
-          animatedLng.setValue(prevCoordRef.current.longitude);
-          Animated.parallel([
-            Animated.timing(animatedLat, { toValue: data.latitude, duration: 1000, useNativeDriver: false }),
-            Animated.timing(animatedLng, { toValue: data.longitude, duration: 1000, useNativeDriver: false }),
-          ]).start();
-        } else {
-          animatedLat.setValue(data.latitude);
-          animatedLng.setValue(data.longitude);
+    const fetchDriver = async () => {
+      const assignedDriverId = ride?.driverId || routeData?.assignedDriverId;
+      if (assignedDriverId) {
+        try {
+          console.log("Fetching driver data for ID:", assignedDriverId);
+          const driverRef = doc(db, COLLECTIONS.USERS, assignedDriverId);
+          const driverSnap = await getDoc(driverRef);
+          if (driverSnap.exists()) {
+            const data = driverSnap.data() as User;
+            console.log("Driver data fetched successfully:", data.fullName, data.vehiclePlate);
+            setDriverData(data);
+          } else {
+            console.warn("Driver document does not exist for ID:", assignedDriverId);
+          }
+        } catch (error) {
+          console.error("Error fetching driver data:", error);
         }
-        prevCoordRef.current = data;
-      } else {
-        setLiveLocation(null);
       }
-    });
+    };
+    fetchDriver();
+  }, [ride?.driverId, routeData?.assignedDriverId]);
 
-    // Also listen to ride status changes
-    const unsubRide = onSnapshot(doc(db, COLLECTIONS.RIDES, rideId), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data() as RideInfo;
-        setRideStatus(data.status);
-        setRideInfo(data);
-      }
-    });
+  // ── REAL-TIME LISTENERS ──
+  useEffect(() => {
+    // Listener 1: Ride status changes
+    const rideUnsub = onSnapshot(
+      doc(db, COLLECTIONS.RIDES, rideId),
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data() as Ride;
+          setRide(data);
+        }
+      },
+    );
+
+    // Listener 2: Driver live location
+    const locationUnsub = onSnapshot(
+      doc(db, COLLECTIONS.LIVE_LOCATIONS, rideId),
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data() as LiveLocation;
+          setDriverLocation(data);
+
+          // Smooth animation for driver marker
+          if (prevCoord.current) {
+            driverMarkerLat.setValue(prevCoord.current.latitude);
+            driverMarkerLng.setValue(prevCoord.current.longitude);
+
+            Animated.timing(driverMarkerLat, {
+              toValue: data.latitude,
+              duration: 1000,
+              useNativeDriver: false,
+            }).start();
+
+            Animated.timing(driverMarkerLng, {
+              toValue: data.longitude,
+              duration: 1000,
+              useNativeDriver: false,
+            }).start();
+
+            // Next Stop Logic: Check if driver reached current next stop
+            if (routeData && routeData.stops[currentStopIndex]) {
+              const dist = calculateDistance(
+                data.latitude,
+                data.longitude,
+                routeData.stops[currentStopIndex].coordinates.latitude,
+                routeData.stops[currentStopIndex].coordinates.longitude,
+              );
+              if (dist < 200 && currentStopIndex < routeData.stops.length - 1) {
+                setCurrentStopIndex((prev) => prev + 1);
+              }
+            }
+          } else {
+            driverMarkerLat.setValue(data.latitude);
+            driverMarkerLng.setValue(data.longitude);
+          }
+          prevCoord.current = {
+            latitude: data.latitude,
+            longitude: data.longitude,
+          };
+        } else {
+          setDriverLocation(null);
+        }
+      },
+    );
 
     return () => {
-      unsubLive();
-      unsubRide();
+      rideUnsub();
+      locationUnsub();
     };
-  }, [rideId]);
+  }, [rideId, routeData, currentStopIndex]);
 
-  if (!rideInfo) {
+  // Handle Loading
+  if (loading || !ride) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text>Loading ride...</Text>
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={{ marginTop: 10 }}>Connecting to ride...</Text>
       </View>
     );
   }
 
-  // State 3: Completed
-  if (rideStatus === 'completed') {
+  // Determine Screen State
+  const isCompleted = ride.status === "completed";
+  const isActive = ride.status === "active" && !!driverLocation;
+  const isWaiting = ride.status === "scheduled" || !driverLocation;
+
+  // ── STATE 3: COMPLETED ──
+  if (isCompleted) {
     return (
-      <View style={styles.completedOverlay}>
-        <Text style={styles.completedEmoji}>🎉</Text>
-        <Text style={styles.completedTitle}>You have arrived!</Text>
-        <Text style={styles.completedRoute}>{rideInfo.routeName}</Text>
-        <View style={styles.completedButtons}>
-          <Button
-            mode="outlined"
-            style={styles.completedBtn}
-            textColor={COLORS.primary}
-            onPress={() => Alert.alert('Review', 'Review screen coming soon!')}
-          >
-            Leave a Review
-          </Button>
-          <Button
-            mode="contained"
-            buttonColor={COLORS.primary}
-            style={styles.completedBtn}
-            onPress={() =>
-              navigation.dispatch(
-                CommonActions.reset({ index: 0, routes: [{ name: 'RideHistory' }] })
-              )
-            }
-          >
-            Go Home
-          </Button>
+      <View style={styles.completedContainer}>
+        <View
+          style={[StyleSheet.absoluteFill, { backgroundColor: COLORS.primary }]}
+        />
+        <View style={styles.completedContent}>
+          <MaterialCommunityIcons name="check-circle" size={80} color="white" />
+          <Text style={styles.completedTitle}>You have arrived!</Text>
+          <Text style={styles.completedRouteName}>
+            {ride.routeName || "Route Completed"}
+          </Text>
+
+          <View style={styles.completedActions}>
+            <Button
+              mode="outlined"
+              textColor="white"
+              style={styles.reviewBtn}
+              contentStyle={styles.btnContent}
+              onPress={() => {
+                const effectiveDriverId =
+                  ride.driverId ||
+                  routeData?.assignedDriverId ||
+                  driverData?.uid;
+
+                if (!effectiveDriverId || effectiveDriverId === "") {
+                  Alert.alert(
+                    "Error",
+                    "Driver ID is missing in ride, route, and driver records. Please ensure a driver is assigned in the database.",
+                  );
+                  return;
+                }
+                navigation.navigate("Review", {
+                  rideId,
+                  driverId: effectiveDriverId,
+                  driverName: effectiveDriverName,
+                });
+              }}
+            >
+              Leave a Review
+            </Button>
+            <Button
+              mode="contained"
+              buttonColor="white"
+              textColor={COLORS.primary}
+              style={styles.homeBtn}
+              contentStyle={styles.btnContent}
+              onPress={() => {
+                navigation.dispatch(
+                  CommonActions.reset({
+                    index: 0,
+                    routes: [{ name: "StudentHome" }],
+                  }),
+                );
+              }}
+            >
+              Go Home
+            </Button>
+          </View>
         </View>
       </View>
     );
   }
 
-  const mapRegion = (liveLocation && liveLocation.latitude && liveLocation.longitude)
-    ? {
-        latitude: liveLocation.latitude,
-        longitude: liveLocation.longitude,
-        latitudeDelta: 0.04,
-        longitudeDelta: 0.04,
-      }
-    : (rideInfo?.startLocation?.latitude && rideInfo?.startLocation?.longitude)
-    ? {
-        latitude: rideInfo.startLocation.latitude,
-        longitude: rideInfo.startLocation.longitude,
+  // Map Region Calculation
+  const getInitialRegion = () => {
+    if (isActive && driverLocation) {
+      return {
+        latitude: driverLocation.latitude,
+        longitude: driverLocation.longitude,
+        latitudeDelta: 0.015,
+        longitudeDelta: 0.015,
+      };
+    }
+    if (routeData && routeData.stops && routeData.stops.length > 0) {
+      return {
+        latitude: routeData.stops[0].coordinates.latitude,
+        longitude: routeData.stops[0].coordinates.longitude,
         latitudeDelta: 0.05,
         longitudeDelta: 0.05,
-      }
-    : {
-        latitude: 0,
-        longitude: 0,
-        latitudeDelta: 0.1,
-        longitudeDelta: 0.1,
       };
+    }
+    return {
+      latitude: 33.6844,
+      longitude: 73.0479,
+      latitudeDelta: 0.1,
+      longitudeDelta: 0.1,
+    };
+  };
 
-  const polylineCoords = (rideInfo?.startLocation && rideInfo?.endLocation) 
-    ? [
-        { latitude: rideInfo.startLocation.latitude, longitude: rideInfo.startLocation.longitude },
-        { latitude: rideInfo.endLocation.latitude, longitude: rideInfo.endLocation.longitude },
-      ]
-    : [];
+  const nextStopName =
+    routeData?.stops?.[currentStopIndex]?.stopName || "Final Destination";
+  const effectiveDriverName =
+    ride.driverName ||
+    routeData?.assignedDriverName ||
+    driverData?.fullName ||
+    "Driver";
+  const effectiveVehiclePlate =
+    ride.vehiclePlate || driverData?.vehiclePlate || "N/A";
+  const effectiveDriverPhone = ride.driverPhone || driverData?.phone || "";
 
+  const driverInitials = effectiveDriverName
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .substring(0, 2)
+    .toUpperCase();
+
+  // ── STATE 1 & 2: RENDER ──
   return (
     <View style={styles.container}>
-      {/* ── Floating Back Button ── */}
-      <TouchableOpacity 
-        style={styles.backButton} 
-        onPress={() => navigation.goBack()}
+      <MapView
+        provider={PROVIDER_GOOGLE}
+        style={styles.map}
+        initialRegion={getInitialRegion()}
       >
-        <MaterialCommunityIcons name="chevron-left" size={28} color={COLORS.text} />
-      </TouchableOpacity>
-
-
-
-      <MapView style={styles.map} region={mapRegion}>
-        {/* Route polyline */}
-        <Polyline coordinates={polylineCoords} strokeColor={COLORS.primary} strokeWidth={3} />
-
-        {/* Start marker */}
-        {rideInfo?.startLocation && (
-          <Marker
-            coordinate={{ latitude: rideInfo.startLocation.latitude, longitude: rideInfo.startLocation.longitude }}
-            pinColor="green"
-            title="Start"
-            description={rideInfo.startLocation.name}
-          />
-        )}
-
-        {/* End marker */}
-        {rideInfo?.endLocation && (
-          <Marker
-            coordinate={{ latitude: rideInfo.endLocation.latitude, longitude: rideInfo.endLocation.longitude }}
-            pinColor="red"
-            title="End"
-            description={rideInfo.endLocation.name}
-          />
-        )}
-
-        {/* Stop markers */}
-        {rideInfo?.stops?.map((stop, i) => (
-          rideInfo.startLocation && (
-            <Marker
-              key={i}
-              coordinate={{ latitude: rideInfo.startLocation.latitude, longitude: rideInfo.startLocation.longitude }}
-              pinColor="blue"
-              title={stop.stopName}
+        {/* Route Polyline (State 2) */}
+        {isActive &&
+          routeData &&
+          routeData.stops &&
+          routeData.stops.length > 0 && (
+            <Polyline
+              coordinates={routeData.stops.map((s) => s.coordinates)}
+              strokeColor={COLORS.primary}
+              strokeWidth={4}
             />
-          )
-        ))}
+          )}
 
-        {/* State 2 - Animated driver marker */}
-        {liveLocation && (
+        {/* Route Stops */}
+        {routeData?.stops?.map((stop, index) => (
           <Marker
-            coordinate={{ latitude: liveLocation.latitude, longitude: liveLocation.longitude }}
-            title="Driver 🚌"
+            key={`stop-${index}`}
+            coordinate={stop.coordinates}
+            title={stop.stopName}
           >
-            <View style={styles.driverMarker}>
-              <Text style={{ fontSize: 22 }}>🚌</Text>
+            <View style={styles.stopMarker}>
+              <Text style={styles.stopText}>{index + 1}</Text>
             </View>
           </Marker>
+        ))}
+
+        {/* Driver Marker (State 2) */}
+        {isActive && driverLocation && (
+          <Marker.Animated
+            coordinate={{
+              latitude: driverMarkerLat as any,
+              longitude: driverMarkerLng as any,
+            }}
+          >
+            <View style={styles.driverMarker}>
+              <MaterialCommunityIcons name="bus" size={20} color="white" />
+            </View>
+          </Marker.Animated>
         )}
 
-        {/* Student location */}
-        {studentLocation && (
-          <Marker coordinate={studentLocation} title="You" pinColor="blue" />
+        {/* Student Location Marker (State 2) */}
+        {isActive && studentLocation && (
+          <Marker
+            coordinate={{
+              latitude: studentLocation.coords.latitude,
+              longitude: studentLocation.coords.longitude,
+            }}
+          >
+            <MaterialCommunityIcons name="circle" size={12} color="blue" />
+          </Marker>
         )}
       </MapView>
 
-      {/* New Bottom Info Panel */}
-      <View style={styles.bottomPanel}>
-        {rideStatus === 'scheduled' && (
-          <View style={styles.waitingBannerNew}>
-            <MaterialCommunityIcons name="clock-outline" size={18} color="#F59E0B" />
-            <Text style={styles.waitingBannerText}>Waiting for driver to start</Text>
-          </View>
-        )}
-
-        <View style={styles.panelTopRow}>
-          <Text style={styles.panelDriverName}>{rideInfo.driverName}</Text>
-          <TouchableOpacity 
-            style={styles.panelPhoneBtn}
-            onPress={() => Linking.openURL(`tel:${rideInfo.driverPhone}`)}
-          >
-            <MaterialCommunityIcons name="phone" size={20} color="white" />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.panelSecondRow}>
-          <MaterialCommunityIcons name="car-info" size={14} color={COLORS.textSecondary} />
-          <Text style={styles.panelVehiclePlate}>
-            {rideInfo.vehiclePlate ? rideInfo.vehiclePlate : 'Vehicle info unavailable'}
-          </Text>
-        </View>
-
-        <View style={styles.panelStatusRow}>
-          <View style={[styles.panelStatusBadge, { 
-            backgroundColor: rideStatus === 'active' ? '#F0FFF4' : 
-                             rideStatus === 'scheduled' ? '#FFF9E6' : '#F3F4F6' 
-          }]}>
-            <View style={[styles.panelStatusDot, { 
-              backgroundColor: rideStatus === 'active' ? '#16A34A' : 
-                               rideStatus === 'scheduled' ? '#F59E0B' : '#9CA3AF' 
-            }]} />
-            <Text style={[styles.panelStatusText, { 
-              color: rideStatus === 'active' ? '#16A34A' : 
-                     rideStatus === 'scheduled' ? '#92400E' : '#6B7280' 
-            }]}>
-              {rideStatus === 'active' ? 'Ride in Progress' : 
-               rideStatus === 'scheduled' ? 'Starting Soon' : 'Ride Completed'}
+      {/* ── STATE 1: WAITING BANNER ── */}
+      {isWaiting && !isCompleted && (
+        <Animated.View style={[styles.waitingBanner, { opacity: pulseAnim }]}>
+          <View style={styles.bannerRow}>
+            <MaterialCommunityIcons
+              name="clock-outline"
+              size={20}
+              color="#F59E0B"
+            />
+            <Text style={styles.waitingText}>
+              Waiting for driver to start the ride
             </Text>
           </View>
+        </Animated.View>
+      )}
+
+      {/* ── STATE 2: ACTIVE INFO CARD ── */}
+      {isActive && (
+        <View style={styles.infoCard}>
+          <View style={styles.handleBar} />
+
+          <View style={styles.driverRow}>
+            {driverData?.profileImageUrl ? (
+              <Avatar.Image
+                size={48}
+                source={{ uri: driverData.profileImageUrl }}
+              />
+            ) : (
+              <Avatar.Text
+                size={48}
+                label={driverInitials}
+                style={{ backgroundColor: COLORS.primary }}
+              />
+            )}
+            <View style={styles.driverDetails}>
+              <Text style={styles.driverName}>{effectiveDriverName}</Text>
+              <View style={styles.plateRow}>
+                <MaterialCommunityIcons
+                  name="card-account-details-outline"
+                  size={14}
+                  color={COLORS.textSecondary}
+                />
+                <Text style={styles.plateNumber}>{effectiveVehiclePlate}</Text>
+              </View>
+            </View>
+
+            {effectiveDriverPhone && (
+              <TouchableOpacity
+                onPress={() => Linking.openURL(`tel:${effectiveDriverPhone}`)}
+                style={styles.phoneIcon}
+              >
+                <MaterialCommunityIcons
+                  name="phone"
+                  size={20}
+                  color={COLORS.primary}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={styles.divider} />
+
+          <View style={styles.nextStopRow}>
+            <MaterialCommunityIcons
+              name="map-marker-right"
+              size={20}
+              color={COLORS.primary}
+            />
+            <Text style={styles.nextStopLabel}>Next Stop:</Text>
+            <Text style={styles.nextStopValue} numberOfLines={1}>
+              {nextStopName}
+            </Text>
+
+            <View style={styles.liveBadge}>
+              <Animated.View
+                style={[styles.liveDot, { opacity: dotPulseAnim }]}
+              />
+              <Text style={styles.liveBadgeText}>Live</Text>
+            </View>
+          </View>
         </View>
-      </View>
+      )}
+
+      {/* Floating Back Button */}
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={() => navigation.goBack()}
+      >
+        <MaterialCommunityIcons
+          name="arrow-left"
+          size={24}
+          color={COLORS.text}
+        />
+      </TouchableOpacity>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  container: { flex: 1 },
+  centerContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   map: { flex: 1 },
-  waitingBanner: {
-    position: 'absolute',
-    top: 100,
-    left: 20,
-    right: 20,
-    backgroundColor: '#FFC107',
-    padding: SPACING.md,
-    borderRadius: 12,
-    zIndex: 10,
-    elevation: 4,
-  },
   backButton: {
-    position: 'absolute',
-    top: 50,
+    position: "absolute",
+    top: 20,
     left: 20,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 20,
-    elevation: 4,
-    shadowColor: '#000',
+    backgroundColor: "white",
+    padding: 10,
+    borderRadius: 25,
+    elevation: 5,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
-  waitingText: { textAlign: 'center', fontWeight: 'bold', color: '#4A3000' },
-  driverMarker: {
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 4,
-    borderWidth: 2,
-    borderColor: COLORS.primary,
-    elevation: 4,
+
+  // State 1: Waiting Banner
+  waitingBanner: {
+    position: "absolute",
+    top: 70,
+    left: 16,
+    right: 16,
+    backgroundColor: "#FFF9E6",
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#F59E0B",
+    elevation: 3,
   },
-  bottomPanel: {
-    backgroundColor: 'white',
+  bannerRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  waitingText: {
+    fontSize: 14,
+    color: "#92400E",
+    fontWeight: "500",
+  },
+
+  // State 2: Info Card Redesign
+  infoCard: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "white",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 20,
-    borderTopWidth: 1,
-    borderColor: '#F0F0F0',
-    elevation: 10,
+    paddingBottom: 32,
+    elevation: 15,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
   },
-  panelTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  handleBar: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#E5E7EB",
+    alignSelf: "center",
+    marginBottom: 16,
   },
-  panelDriverName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.text,
+  driverRow: { flexDirection: "row", alignItems: "center" },
+  driverDetails: { flex: 1, marginLeft: 16 },
+  driverName: { fontSize: 17, fontWeight: "700", color: COLORS.text },
+  plateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 2,
   },
-  panelPhoneBtn: {
+  plateNumber: { fontSize: 13, color: COLORS.textSecondary },
+  phoneIcon: {
+    backgroundColor: "#F0F4FF",
     width: 44,
     height: 44,
-    backgroundColor: '#16A34A',
     borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
-  panelSecondRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-    gap: 6,
+  divider: {
+    height: 1,
+    backgroundColor: "#F3F4F6",
+    marginBottom: 16,
+    marginTop: 16,
   },
-  panelVehiclePlate: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
+  nextStopRow: { flexDirection: "row", alignItems: "center" },
+  nextStopLabel: { fontSize: 13, color: COLORS.textSecondary, marginLeft: 8 },
+  nextStopValue: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.text,
+    marginLeft: 4,
+    flex: 1,
   },
-  panelStatusRow: {
-    marginTop: 10,
-    alignItems: 'flex-start',
-  },
-  panelStatusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  liveBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#DCFCE7",
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 20,
-    gap: 6,
   },
-  panelStatusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#16A34A",
+    marginRight: 6,
   },
-  panelStatusText: {
-    fontSize: 11,
-    fontWeight: '700',
+  liveBadgeText: { fontSize: 11, fontWeight: "600", color: "#16A34A" },
+
+  // Markers
+  driverMarker: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 20,
+    padding: 8,
+    borderWidth: 2,
+    borderColor: "white",
+    elevation: 5,
   },
-  waitingBannerNew: {
-    backgroundColor: '#FFF9E6',
+  stopMarker: {
+    backgroundColor: "white",
+    width: 24,
+    height: 24,
     borderRadius: 12,
-    padding: 14,
-    marginBottom: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  waitingBannerText: {
-    fontSize: 14,
-    color: '#92400E',
-    fontWeight: '500',
-  },
-  completedOverlay: {
+  stopText: { fontSize: 12, fontWeight: "bold", color: COLORS.primary },
+
+  // State 3: Completed
+  completedContainer: { flex: 1 },
+  completedContent: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: COLORS.background,
-    padding: SPACING.xl,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 30,
+    zIndex: 1,
   },
-  completedEmoji: { fontSize: 80, marginBottom: SPACING.lg },
-  completedTitle: { fontSize: 28, fontWeight: 'bold', color: COLORS.primary, marginBottom: SPACING.sm },
-  completedRoute: { fontSize: FONTS.lg, color: COLORS.textSecondary, marginBottom: SPACING.xl },
-  completedButtons: { flexDirection: 'row', gap: SPACING.md },
-  completedBtn: { flex: 1, borderRadius: 8 },
+  completedTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "white",
+    marginTop: 20,
+  },
+  completedRouteName: {
+    fontSize: 16,
+    color: "white",
+    opacity: 0.8,
+    marginTop: 8,
+    textAlign: "center",
+  },
+  completedActions: { width: "100%", marginTop: 40, gap: 15 },
+  reviewBtn: { borderRadius: 12, borderColor: "white" },
+  homeBtn: { borderRadius: 12 },
+  btnContent: { paddingVertical: 14 },
 });
 
 export default TrackRideScreen;

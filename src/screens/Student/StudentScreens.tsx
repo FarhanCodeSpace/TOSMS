@@ -1,5 +1,6 @@
 // Real Student screens — corporate transport model
 export { default as StudentHomeScreen } from './StudentHomeScreen';
+export { ReviewScreen } from './ReviewScreen';
 export { RideHistoryScreen } from './RideHistoryScreen';
 export { TrackRideScreen } from './TrackRideScreen';
 export { StudentProfileScreen } from './StudentProfileScreen';

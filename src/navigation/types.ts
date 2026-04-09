@@ -14,6 +14,7 @@ export type StudentHomeStackParamList = {
   Availability: undefined;
   StudentAvailability: undefined;
   TrackRide: { rideId: string };
+  Review: { rideId: string; driverId: string; driverName: string };
   ChallanDeposit: { challanId: string; challanNumber: string };
   PaymentHistory: undefined;
 };
@@ -25,6 +26,7 @@ export type StudentMyRouteStackParamList = {
 export type StudentRidesStackParamList = {
   RideHistory: undefined;
   TrackRide: { rideId: string };
+  Review: { rideId: string; driverId: string; driverName: string };
 };
 
 export type StudentProfileStackParamList = {

@@ -151,6 +151,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation, route }) => {
             style={styles.button}
             contentStyle={styles.buttonContent}
             buttonColor={COLORS.primary}
+            textColor={COLORS.onPrimary}
           >
             Login
           </Button>
@@ -174,7 +175,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation, route }) => {
         style={styles.snackbar}
         action={{
           label: 'OK',
-          textColor: '#FFF',
+          labelStyle: { color: '#FFF' },
           onPress: () => setSuccessVisible(false),
         }}
       >

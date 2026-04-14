@@ -10,6 +10,7 @@ import { format, parseISO } from 'date-fns';
 import { getDoc, doc } from 'firebase/firestore';
 import { Availability } from '../../types';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { getAuth } from "firebase/auth";
 
 interface AvailabilityWithId extends Availability {
   availabilityId: string;
@@ -50,14 +51,24 @@ export const RideHistoryScreen: React.FC = () => {
       orderBy('date', 'desc')
     );
 
-    const unsub = onSnapshot(q, (snap) => {
-      const data: AvailabilityWithId[] = snap.docs.map(d => ({
-        availabilityId: d.id,
-        ...(d.data() as Availability),
-      }));
-      setRecords(data);
-      setLoading(false);
-    });
+    const auth = getAuth();
+    const unsub = onSnapshot(
+      q, 
+      (snap) => {
+        if (!auth.currentUser) return;
+        const data: AvailabilityWithId[] = snap.docs.map(d => ({
+          availabilityId: d.id,
+          ...(d.data() as Availability),
+        }));
+        setRecords(data);
+        setLoading(false);
+      },
+      (error: any) => {
+        if (error.code === 'permission-denied') return;
+        console.error("Ride history listener error:", error);
+        setLoading(false);
+      }
+    );
 
     return () => unsub();
   }, [currentUser?.uid]);

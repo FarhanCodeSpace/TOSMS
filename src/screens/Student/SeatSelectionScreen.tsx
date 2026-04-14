@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Text, Button } from 'react-native-paper';
 import { Picker } from '@react-native-picker/picker';
+import { getAuth } from "firebase/auth";
 import { db } from '@config/firebase';
 import { COLLECTIONS } from '@config/firebaseCollections';
 import {
@@ -56,11 +57,20 @@ export const SeatSelectionScreen: React.FC<SeatSelectionScreenProps> = ({ route,
   const [isConfirming, setIsConfirming] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(doc(db, COLLECTIONS.RIDES, rideId), (snap) => {
-      if (snap.exists()) {
-        setRide(snap.data() as RideData);
+    const auth = getAuth();
+    const unsubscribe = onSnapshot(
+      doc(db, COLLECTIONS.RIDES, rideId), 
+      (snap) => {
+        if (!auth.currentUser) return;
+        if (snap.exists()) {
+          setRide(snap.data() as RideData);
+        }
+      },
+      (error: any) => {
+        if (error.code === 'permission-denied') return;
+        console.error("Seat selection ride listener error:", error);
       }
-    });
+    );
     return () => unsubscribe();
   }, [rideId]);
 

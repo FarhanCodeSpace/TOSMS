@@ -6,6 +6,7 @@ import { Swipeable, GestureHandlerRootView } from 'react-native-gesture-handler'
 import { db } from '@config/firebase';
 import { COLLECTIONS } from '@config/firebaseCollections';
 import { doc, getDoc, onSnapshot, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { getAuth } from "firebase/auth";
 import { COLORS, SPACING } from '@constants/theme';
 import { getPakistanTodayString } from '@utils/dateHelpers';
 import { Route, User, Availability } from '@types';
@@ -60,15 +61,21 @@ export const PassengersScreen: React.FC<any> = ({ route, navigation }) => {
         setStudents(studentList);
 
         // Set up listeners OUTSIDE async, pushed to unsubscribers array
+        const auth = getAuth();
         studentIds.forEach((uid: string) => {
           const availDocId = uid + '_' + todayStr;
           const unsub = onSnapshot(
             doc(db, COLLECTIONS.AVAILABILITY, availDocId),
             (snap) => {
+              if (!auth.currentUser) return;
               setAvailabilityMap(prev => ({
                 ...prev,
                 [uid]: snap.exists() ? snap.data() : null
               }));
+            },
+            (error: any) => {
+              if (error.code === 'permission-denied') return;
+              console.error("Student availability listener error:", error);
             }
           );
           unsubscribers.push(unsub);

@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { db } from '@config/firebase';
 import { COLLECTIONS } from '@config/firebaseCollections';
 import { collection, query, where, getDocs, doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { getAuth } from "firebase/auth";
 import { COLORS } from '@constants/theme';
 import { format } from 'date-fns';
 import { getPakistanTodayString } from '@utils/dateHelpers';
@@ -73,16 +74,22 @@ const TodayStudentsScreen: React.FC<any> = ({ navigation, route }) => {
         setStudents(studentList);
 
         // 3. Set up real-time availability listeners for each student
+        const auth = getAuth();
         const unsubscribers: (() => void)[] = [];
         studentIds.forEach(uid => {
           const availDocId = uid + '_' + date;
           const unsub = onSnapshot(
             doc(db, COLLECTIONS.AVAILABILITY, availDocId),
             (snap) => {
+              if (!auth.currentUser) return;
               setAvailabilityMap(prev => ({
                 ...prev,
                 [uid]: snap.exists() ? snap.data() : null
               }));
+            },
+            (error: any) => {
+              if (error.code === 'permission-denied') return;
+              console.error("Student availability listener error:", error);
             }
           );
           unsubscribers.push(unsub);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   StyleSheet,
@@ -24,6 +24,8 @@ import {
   doc,
   limit,
 } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
+import { useFocusEffect } from "@react-navigation/native";
 import { format, addDays } from "date-fns";
 import {
   getPakistanTodayString,
@@ -54,102 +56,143 @@ const StudentHomeScreen: React.FC<{
 
   const tomorrowStr = getPakistanTomorrowString();
 
-  useEffect(() => {
-    if (!currentUser?.uid) return;
+  useFocusEffect(
+    useCallback(() => {
+      if (!currentUser?.uid) return;
+      const auth = getAuth();
 
-    // 1. Route Listener
-    const routeQuery = query(
-      collection(db, COLLECTIONS.ROUTES),
-      where("studentIds", "array-contains", currentUser.uid),
-      limit(1),
-    );
-    const unsubscribeRoute = onSnapshot(routeQuery, (snapshot) => {
-      if (!snapshot.empty) {
-        setMyRoute({ id: snapshot.docs[0].id, ...snapshot.docs[0].data() });
-      } else {
-        setMyRoute(null);
-      }
-    });
-
-    // 2. Today's Ride Listener
-    let unsubscribeRide = () => {};
-    if (currentUser.routeId) {
-      const rideQuery = query(
-        collection(db, COLLECTIONS.RIDES),
-        where("routeId", "==", currentUser.routeId),
-        where("status", "in", ["scheduled", "active", "completed"]),
+      // 1. Route Listener
+      const routeQuery = query(
+        collection(db, COLLECTIONS.ROUTES),
+        where("studentIds", "array-contains", currentUser.uid),
+        limit(1),
       );
-      unsubscribeRide = onSnapshot(rideQuery, (snapshot) => {
-        const todayStr = getPakistanTodayString();
-        const activeRide = snapshot.docs.find(
-          (doc) => doc.data().date === todayStr,
-        );
-        setTodayRide(
-          activeRide ? { rideId: activeRide.id, ...activeRide.data() } : null,
-        );
-      });
-    }
-
-    // 3. Fee Status Listener
-    const currentMonth = getPakistanTodayString().substring(0, 7); // 'yyyy-MM'
-    const feeQuery = query(
-      collection(db, COLLECTIONS.FEE_PAYMENTS),
-      where("studentId", "==", currentUser.uid),
-      where("month", "==", currentMonth),
-      limit(1),
-    );
-
-    const unsubscribeFee = onSnapshot(feeQuery, (snapshot) => {
-      if (!snapshot.empty) {
-        const paymentData = snapshot.docs[0].data();
-        setFeeStatus(paymentData.paymentStatus); // 'verified', 'submitted', or 'pending'
-        setFeePayment(paymentData);
-      } else {
-        setFeeStatus("pending");
-        setFeePayment(null);
-      }
-    });
-
-    // 4. Availability Listener for Tomorrow
-    const availDocId = `${currentUser.uid}_${tomorrowStr}`;
-    const unsubscribeAvail = onSnapshot(
-      doc(db, COLLECTIONS.AVAILABILITY, availDocId),
-      (snapshot) => {
-        setAvailabilityDoc(snapshot.exists() ? snapshot.data() : null);
-      },
-    );
-
-    // 5. Week Availability Listener
-    const today = new Date(); // Using for loop logic below, keep for now if needed or refactor
-    const next7Days = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(
-        new Date(getPakistanTodayString() + "T00:00:00").getTime() +
-          i * 24 * 60 * 60 * 1000,
+      const unsubscribeRoute = onSnapshot(
+        routeQuery,
+        (snapshot) => {
+          if (!auth.currentUser) return;
+          if (!snapshot.empty) {
+            setMyRoute({ id: snapshot.docs[0].id, ...snapshot.docs[0].data() });
+          } else {
+            setMyRoute(null);
+          }
+        },
+        (error: any) => {
+          if (error.code === "permission-denied") return;
+          console.error("Route listener error:", error);
+        },
       );
-      return d.toISOString().split("T")[0];
-    });
-    const weekQuery = query(
-      collection(db, COLLECTIONS.AVAILABILITY),
-      where("userId", "==", currentUser.uid),
-      where("date", "in", next7Days),
-    );
-    const unsubscribeWeek = onSnapshot(weekQuery, (snapshot) => {
-      const availMap: Record<string, any> = {};
-      snapshot.forEach((d) => {
-        availMap[d.data().date] = d.data();
-      });
-      setWeekAvailability(availMap);
-    });
 
-    setIsLoading(false);
-    return () => {
-      unsubscribeRoute();
-      unsubscribeRide();
-      unsubscribeFee();
-      unsubscribeAvail();
-      unsubscribeWeek();
-    };
-  }, [currentUser?.uid]);
+      // 2. Today's Ride Listener
+      let unsubscribeRide = () => {};
+      if (currentUser.routeId) {
+        const rideQuery = query(
+          collection(db, COLLECTIONS.RIDES),
+          where("routeId", "==", currentUser.routeId),
+          where("status", "in", ["scheduled", "active", "completed"]),
+        );
+        unsubscribeRide = onSnapshot(
+          rideQuery,
+          (snapshot) => {
+            if (!auth.currentUser) return;
+            const todayStr = getPakistanTodayString();
+            const activeRide = snapshot.docs.find(
+              (doc) => doc.data().date === todayStr,
+            );
+            setTodayRide(
+              activeRide
+                ? { rideId: activeRide.id, ...activeRide.data() }
+                : null,
+            );
+          },
+          (error: any) => {
+            if (error.code === "permission-denied") return;
+            console.error("Ride listener error:", error);
+          },
+        );
+      }
+
+      // 3. Fee Status Listener
+      const currentMonth = getPakistanTodayString().substring(0, 7); // 'yyyy-MM'
+      const feeQuery = query(
+        collection(db, COLLECTIONS.FEE_PAYMENTS),
+        where("studentId", "==", currentUser.uid),
+        where("month", "==", currentMonth),
+        limit(1),
+      );
+
+      const unsubscribeFee = onSnapshot(
+        feeQuery,
+        (snapshot) => {
+          if (!auth.currentUser) return;
+          if (!snapshot.empty) {
+            const paymentData = snapshot.docs[0].data();
+            setFeeStatus(paymentData.paymentStatus); // 'verified', 'submitted', or 'pending'
+            setFeePayment(paymentData);
+          } else {
+            setFeeStatus("pending");
+            setFeePayment(null);
+          }
+        },
+        (error: any) => {
+          if (error.code === "permission-denied") return;
+          console.error("Fee listener error:", error);
+        },
+      );
+
+      // 4. Availability Listener for Tomorrow
+      const availDocId = `${currentUser.uid}_${tomorrowStr}`;
+      const unsubscribeAvail = onSnapshot(
+        doc(db, COLLECTIONS.AVAILABILITY, availDocId),
+        (snapshot) => {
+          if (!auth.currentUser) return;
+          setAvailabilityDoc(snapshot.exists() ? snapshot.data() : null);
+        },
+        (error: any) => {
+          if (error.code === "permission-denied") return;
+          console.error("Availability listener error:", error);
+        },
+      );
+
+      // 5. Week Availability Listener
+      const next7Days = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(
+          new Date(getPakistanTodayString() + "T00:00:00").getTime() +
+            i * 24 * 60 * 60 * 1000,
+        );
+        return d.toISOString().split("T")[0];
+      });
+      const weekQuery = query(
+        collection(db, COLLECTIONS.AVAILABILITY),
+        where("userId", "==", currentUser.uid),
+        where("date", "in", next7Days),
+      );
+      const unsubscribeWeek = onSnapshot(
+        weekQuery,
+        (snapshot) => {
+          if (!auth.currentUser) return;
+          const availMap: Record<string, any> = {};
+          snapshot.forEach((d) => {
+            availMap[d.data().date] = d.data();
+          });
+          setWeekAvailability(availMap);
+        },
+        (error: any) => {
+          if (error.code === "permission-denied") return;
+          console.error("Week availability listener error:", error);
+        },
+      );
+
+      setIsLoading(false);
+      return () => {
+        unsubscribeRoute();
+        unsubscribeRide();
+        unsubscribeFee();
+        unsubscribeAvail();
+        unsubscribeWeek();
+      };
+    }, [currentUser?.uid, currentUser.routeId, tomorrowStr])
+  );
 
   useEffect(() => {
     if (todayRide?.status === "active") {
@@ -672,7 +715,7 @@ const StudentHomeScreen: React.FC<{
                     <Text style={styles.rideActionBtnText}>Track Now</Text>
                   </TouchableOpacity>
                 </View>
-              ) : (
+              ) : todayRide.status === "completed" ? (
                 <View style={styles.rideStateCard}>
                   <View
                     style={[
@@ -687,7 +730,7 @@ const StudentHomeScreen: React.FC<{
                     <View
                       style={[
                         styles.rideStatusPill,
-                        { backgroundColor: "#F3F4F6" },
+                        { backgroundColor: "#F3F4F6", borderWidth: 1, borderColor: "#E5E7EB" },
                       ]}
                     >
                       <Text
@@ -702,15 +745,15 @@ const StudentHomeScreen: React.FC<{
                       <MaterialCommunityIcons
                         name="check-circle"
                         size={14}
-                        color="#9CA3AF"
+                        color="#16A34A"
                       />
-                      <Text style={[styles.rideInfoText, { color: "#9CA3AF" }]}>
+                      <Text style={[styles.rideInfoText, { color: "#16A34A", fontWeight: "600" }]}>
                         Ride completed
                       </Text>
                     </View>
                     <View style={styles.rideInfoItem}>
                       <MaterialCommunityIcons
-                        name="calendar"
+                        name="calendar-check"
                         size={14}
                         color={COLORS.textSecondary}
                       />
@@ -721,8 +764,19 @@ const StudentHomeScreen: React.FC<{
                       </Text>
                     </View>
                   </View>
+                  <TouchableOpacity
+                    style={[styles.rideActionBtn, { backgroundColor: "#9CA3AF", marginTop: 16 }]}
+                    disabled={true}
+                  >
+                    <MaterialCommunityIcons
+                      name="bus-stop"
+                      size={16}
+                      color="white"
+                    />
+                    <Text style={styles.rideActionBtnText}>Arrived at Destination</Text>
+                  </TouchableOpacity>
                 </View>
-              )}
+              ) : null}
             </View>
           </View>
 

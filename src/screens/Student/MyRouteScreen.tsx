@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -11,6 +11,8 @@ import { Text, Card, Avatar, Button } from 'react-native-paper';
 import { db } from '@config/firebase';
 import { COLLECTIONS } from '@config/firebaseCollections';
 import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
+import { getAuth } from "firebase/auth";
+import { useFocusEffect } from "@react-navigation/native";
 import { useAuth } from '@hooks/useAuth';
 import { COLORS, SPACING } from '@constants/theme';
 import MapView, { Marker, Polyline } from 'react-native-maps';
@@ -41,44 +43,80 @@ const MyRouteScreen: React.FC<MyRouteScreenProps> = ({ navigation }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [availableCount, setAvailableCount] = useState(0);
 
-  useEffect(() => {
-    if (!currentUser?.routeId) {
-      setIsLoading(false);
-      return;
-    }
-
-    const unsubRoute = onSnapshot(doc(db, COLLECTIONS.ROUTES, currentUser.routeId), async (docSnap) => {
-      if (docSnap.exists()) {
-        const routeData = { routeId: docSnap.id, ...docSnap.data() } as Route;
-        setRoute(routeData);
-
-        // Fetch Driver Info
-        if (routeData.assignedDriverId) {
-          const driverDoc = await getDoc(doc(db, COLLECTIONS.USERS, routeData.assignedDriverId));
-          if (driverDoc.exists()) {
-            setDriver(driverDoc.data() as User);
-          }
-        }
-
-        // Fetch Availability Count (Real-time)
-        const todayStr = format(new Date(), 'yyyy-MM-dd');
-        const q = query(
-          collection(db, COLLECTIONS.AVAILABILITY),
-          where('routeId', '==', currentUser.routeId),
-          where('date', '==', todayStr),
-          where('role', '==', 'student'),
-          where('isAvailable', '==', true)
-        );
-        
-        onSnapshot(q, (snapshot) => {
-          setAvailableCount(snapshot.size);
-        });
+  useFocusEffect(
+    useCallback(() => {
+      if (!currentUser?.routeId) {
+        setIsLoading(false);
+        return;
       }
-      setIsLoading(false);
-    });
+      const auth = getAuth();
 
-    return () => unsubRoute();
-  }, [currentUser?.routeId]);
+      const cleanups: (() => void)[] = [];
+
+      // 1. Route Listener
+      const unsubRoute = onSnapshot(
+        doc(db, COLLECTIONS.ROUTES, currentUser.routeId),
+        async (docSnap) => {
+          if (!auth.currentUser) return;
+          if (docSnap.exists()) {
+            const routeData = {
+              routeId: docSnap.id,
+              ...docSnap.data(),
+            } as Route;
+            setRoute(routeData);
+
+            // Fetch Driver Info
+            if (routeData.assignedDriverId) {
+              try {
+                const driverDoc = await getDoc(
+                  doc(db, COLLECTIONS.USERS, routeData.assignedDriverId),
+                );
+                if (driverDoc.exists() && auth.currentUser) {
+                  setDriver(driverDoc.data() as User);
+                }
+              } catch (err) {
+                console.error("Error fetching driver info:", err);
+              }
+            }
+          }
+          setIsLoading(false);
+        },
+        (error: any) => {
+          if (error.code === "permission-denied") return;
+          console.error("Route listener error:", error);
+          setIsLoading(false);
+        },
+      );
+      cleanups.push(unsubRoute);
+
+      // 2. Availability Count Listener
+      const todayStr = format(new Date(), "yyyy-MM-dd");
+      const q = query(
+        collection(db, COLLECTIONS.AVAILABILITY),
+        where("routeId", "==", currentUser.routeId),
+        where("date", "==", todayStr),
+        where("role", "==", "student"),
+        where("isAvailable", "==", true),
+      );
+
+      const unsubAvail = onSnapshot(
+        q,
+        (snapshot) => {
+          if (!auth.currentUser) return;
+          setAvailableCount(snapshot.size);
+        },
+        (error: any) => {
+          if (error.code === "permission-denied") return;
+          console.error("Availability list listener error:", error);
+        },
+      );
+      cleanups.push(unsubAvail);
+
+      return () => {
+        cleanups.forEach((fn) => fn());
+      };
+    }, [currentUser?.routeId])
+  );
 
   const handlePhonePress = (phone: string) => {
     Linking.openURL(`tel:${phone}`);

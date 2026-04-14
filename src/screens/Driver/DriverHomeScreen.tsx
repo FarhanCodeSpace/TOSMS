@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   StyleSheet,
@@ -26,6 +26,8 @@ import {
   getDoc,
   updateDoc,
 } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
+import { useFocusEffect } from "@react-navigation/native";
 import {
   getPakistanTodayString,
   getPakistanTomorrowString,
@@ -67,144 +69,135 @@ const DriverHomeScreen: React.FC<DriverHomeScreenProps> = ({ navigation }) => {
     return "Good Night";
   };
 
-  // FIX 3: Driver Availability Listener (for tomorrow)
-  useEffect(() => {
-    if (!currentUser?.uid) return;
-    const tomorrowStr = getPakistanTomorrowString();
-    const availDocId = currentUser.uid + "_" + tomorrowStr;
-    const unsub = onSnapshot(
-      doc(db, COLLECTIONS.AVAILABILITY, availDocId),
-      (snap) => {
-        if (snap.exists()) {
-          setDriverAvailabilityDoc({ ...snap.data() });
-        } else {
-          setDriverAvailabilityDoc(null);
-        }
-      },
-      (error: any) => {
-        if (error.code !== "permission-denied") {
-          console.error("Availability listener error:", error);
-        }
-        setDriverAvailabilityDoc(null);
-      },
-    );
-    return () => unsub();
-  }, [currentUser?.uid]);
+  useFocusEffect(
+    useCallback(() => {
+      if (!currentUser?.uid) return;
+      const auth = getAuth();
 
-  useEffect(() => {
-    if (!currentUser?.uid) return;
+      const cleanups: (() => void)[] = [];
 
-    const cleanups: (() => void)[] = [];
-
-    const fetchRouteAndRides = async () => {
-      try {
-        setRouteLoading(true);
-        console.log("Fetching route for driver:", currentUser.uid);
-        const routeQuery = query(
-          collection(db, COLLECTIONS.ROUTES),
-          where("assignedDriverId", "==", currentUser.uid),
-        );
-        const routeSnap = await getDocs(routeQuery);
-
-        if (!routeSnap.empty) {
-          const routeDoc = routeSnap.docs[0];
-          const routeData = {
-            routeId: routeDoc.id,
-            ...routeDoc.data(),
-          } as Route & { routeId: string };
-
-          setMyRoute(routeData);
-          setRouteLoading(false);
-
-          const todayStr = getPakistanTodayString();
-          const studentIds = routeData.studentIds || [];
-
-          if (studentIds.length > 0) {
-            // Today's available and boarded count listener
-            const todayStatusMap: Record<string, boolean> = {};
-            const todayBoardedMap: Record<string, boolean> = {};
-
-            studentIds.forEach((sid: string) => {
-              const docId = `${sid}_${todayStr}`;
-              const unsub = onSnapshot(
-                doc(db, COLLECTIONS.AVAILABILITY, docId),
-                (docSnap) => {
-                  const data = docSnap.exists() ? docSnap.data() : null;
-                  todayStatusMap[sid] = data?.isAvailable === true;
-                  todayBoardedMap[sid] = data?.boarded === true;
-
-                  const availableCount =
-                    Object.values(todayStatusMap).filter(Boolean).length;
-                  const boardedCount =
-                    Object.values(todayBoardedMap).filter(Boolean).length;
-
-                  setTodayAvailableCount(availableCount);
-                  setTodayBoardedCount(boardedCount);
-                },
-              );
-              cleanups.push(unsub);
-            });
+      // Availability Listener
+      const tomorrowStr = getPakistanTomorrowString();
+      const availDocId = currentUser.uid + "_" + tomorrowStr;
+      const unsubAvail = onSnapshot(
+        doc(db, COLLECTIONS.AVAILABILITY, availDocId),
+        (snap) => {
+          if (!auth.currentUser) return;
+          if (snap.exists()) {
+            setDriverAvailabilityDoc({ ...snap.data() });
+          } else {
+            setDriverAvailabilityDoc(null);
           }
+        },
+        (error: any) => {
+          if (error.code === "permission-denied") return;
+          console.error("Availability listener error:", error);
+          setDriverAvailabilityDoc(null);
+        },
+      );
+      cleanups.push(unsubAvail);
 
-          // FIX 1: Ride Listener INSIDE route fetch
-          console.log(
-            "Starting ride listener for routeId:",
-            routeDoc.id,
-            "date:",
-            todayStr,
+      const fetchRouteAndRides = async () => {
+        try {
+          if (!auth.currentUser) return;
+          setRouteLoading(true);
+          const routeQuery = query(
+            collection(db, COLLECTIONS.ROUTES),
+            where("assignedDriverId", "==", currentUser.uid),
           );
-          const ridesQuery = query(
-            collection(db, COLLECTIONS.RIDES),
-            where("routeId", "==", routeDoc.id),
-            where("status", "in", ["scheduled", "active"]),
-          );
+          const routeSnap = await getDocs(routeQuery);
 
-          const unsubRides = onSnapshot(
-            ridesQuery,
-            (snapshot) => {
-              console.log("Rides snapshot size:", snapshot.size);
-              let found: (Ride & { rideId: string }) | null = null;
+          if (!routeSnap.empty) {
+            const routeDoc = routeSnap.docs[0];
+            const routeData = {
+              routeId: routeDoc.id,
+              ...routeDoc.data(),
+            } as Route & { routeId: string };
 
-              snapshot.forEach((d) => {
-                const rData = d.data();
-                console.log("Ride doc:", d.id, rData.date, rData.status);
-                if (rData.date === todayStr) {
-                  found = { rideId: d.id, ...rData } as Ride & {
-                    rideId: string;
-                  };
-                }
+            setMyRoute(routeData);
+            setRouteLoading(false);
+
+            const todayStr = getPakistanTodayString();
+            const studentIds = routeData.studentIds || [];
+
+            if (studentIds.length > 0) {
+              const todayStatusMap: Record<string, boolean> = {};
+              const todayBoardedMap: Record<string, boolean> = {};
+
+              studentIds.forEach((sid: string) => {
+                const docId = `${sid}_${todayStr}`;
+                const unsub = onSnapshot(
+                  doc(db, COLLECTIONS.AVAILABILITY, docId),
+                  (docSnap) => {
+                    if (!auth.currentUser) return;
+                    const data = docSnap.exists() ? docSnap.data() : null;
+                    todayStatusMap[sid] = data?.isAvailable === true;
+                    todayBoardedMap[sid] = data?.boarded === true;
+
+                    const availableCount =
+                      Object.values(todayStatusMap).filter(Boolean).length;
+                    const boardedCount =
+                      Object.values(todayBoardedMap).filter(Boolean).length;
+
+                    setTodayAvailableCount(availableCount);
+                    setTodayBoardedCount(boardedCount);
+                  },
+                  (error: any) => {
+                    if (error.code === "permission-denied") return;
+                    console.error("Student availability listener error:", error);
+                  }
+                );
+                cleanups.push(unsub);
               });
+            }
 
-              console.log("Found ride:", found);
-              setTodayRide(found);
-              setRideLoading(false);
-            },
-            (err: any) => {
-              if (err.code !== "permission-denied") {
+            const ridesQuery = query(
+              collection(db, COLLECTIONS.RIDES),
+              where("routeId", "==", routeDoc.id),
+              where("status", "in", ["scheduled", "active", "completed"]),
+            );
+
+            const unsubRides = onSnapshot(
+              ridesQuery,
+              (snapshot) => {
+                if (!auth.currentUser) return;
+                let found: (Ride & { rideId: string }) | null = null;
+                snapshot.forEach((d) => {
+                  const rData = d.data();
+                  if (rData.date === todayStr) {
+                    found = { rideId: d.id, ...rData } as Ride & {
+                      rideId: string;
+                    };
+                  }
+                });
+                setTodayRide(found);
+                setRideLoading(false);
+              },
+              (err: any) => {
+                if (err.code === "permission-denied") return;
                 console.error("Ride listener error:", err);
-              }
-              setRideLoading(false);
-            },
-          );
-          cleanups.push(unsubRides);
-        } else {
-          console.log("No route found for driver");
+                setRideLoading(false);
+              },
+            );
+            cleanups.push(unsubRides);
+          } else {
+            setRouteLoading(false);
+            setRideLoading(false);
+          }
+        } catch (error) {
+          console.error("Error in fetchRouteAndRides:", error);
           setRouteLoading(false);
           setRideLoading(false);
         }
-      } catch (error) {
-        console.error("Error in fetchRouteAndRides:", error);
-        setRouteLoading(false);
-        setRideLoading(false);
-      }
-    };
+      };
 
-    fetchRouteAndRides();
+      fetchRouteAndRides();
 
-    return () => {
-      cleanups.forEach((fn) => fn());
-    };
-  }, [currentUser?.uid]);
+      return () => {
+        cleanups.forEach((fn) => fn());
+      };
+    }, [currentUser?.uid])
+  );
 
   useEffect(() => {
     if (todayRide?.status === "active") {
@@ -477,6 +470,7 @@ const DriverHomeScreen: React.FC<DriverHomeScreenProps> = ({ navigation }) => {
             />
           ) : todayRide?.status === "scheduled" ? (
             <View style={styles.rideScheduledCard}>
+              <View style={[styles.rideAccentBar, { backgroundColor: "#F59E0B" }]} />
               <View style={styles.rideTopRow}>
                 <Text style={styles.rideRouteTitle}>{todayRide.routeName}</Text>
                 <View style={styles.badgeOrange}>
@@ -516,6 +510,7 @@ const DriverHomeScreen: React.FC<DriverHomeScreenProps> = ({ navigation }) => {
             </View>
           ) : todayRide?.status === "active" ? (
             <View style={styles.rideActiveCard}>
+              <View style={[styles.rideAccentBar, { backgroundColor: "#16A34A" }]} />
               <View style={styles.rideTopRow}>
                 <Text style={styles.rideRouteTitle}>{todayRide.routeName}</Text>
                 <View style={styles.badgeGreen}>
@@ -533,6 +528,48 @@ const DriverHomeScreen: React.FC<DriverHomeScreenProps> = ({ navigation }) => {
                 onPress={handleResumeRide}
               >
                 <Text style={styles.actionBtnText}>Resume</Text>
+              </TouchableOpacity>
+            </View>
+          ) : todayRide?.status === "completed" ? (
+            <View style={styles.rideCompletedCard}>
+              <View style={[styles.rideAccentBar, { backgroundColor: "#9CA3AF" }]} />
+              <View style={styles.rideTopRow}>
+                <Text style={[styles.rideRouteTitle, { color: "#6B7280" }]}>
+                  {todayRide.routeName}
+                </Text>
+                <View style={styles.badgeGrey}>
+                  <Text style={styles.badgeTextGrey}>Completed</Text>
+                </View>
+              </View>
+              <View style={styles.rideInfoRow}>
+                <MaterialCommunityIcons
+                  name="check-circle"
+                  size={16}
+                  color="#16A34A"
+                />
+                <Text style={[styles.rideInfoText, { color: "#16A34A", fontWeight: "600" }]}>
+                  Ride finished successfully
+                </Text>
+                <View style={styles.flexSpacer} />
+                <MaterialCommunityIcons
+                  name="clock-check-outline"
+                  size={16}
+                  color="#6B7280"
+                />
+                <Text style={styles.rideInfoText}>
+                  {String(todayRide.departureTime)}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.actionBtnPrimary, { backgroundColor: "#6B7280", opacity: 0.8 }]}
+                disabled={true}
+              >
+                <MaterialCommunityIcons
+                  name="checkbox-marked-circle-outline"
+                  size={20}
+                  color="white"
+                />
+                <Text style={styles.actionBtnText}>Ride Completed</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -691,29 +728,50 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     borderRadius: 16,
     padding: 16,
+    paddingLeft: 22,
     marginBottom: 4,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: "#F3F4F6",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 3,
+    overflow: "hidden",
+    position: "relative",
   },
   rideActiveCard: {
     backgroundColor: "white",
     borderRadius: 16,
     padding: 16,
+    paddingLeft: 22,
     marginBottom: 4,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-    borderLeftWidth: 4,
-    borderLeftColor: "#16A34A",
-    borderWidth: 1,
-    borderColor: "#F3F4F6",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 3,
+    overflow: "hidden",
+    position: "relative",
+  },
+  rideCompletedCard: {
+    backgroundColor: "white",
+    borderRadius: 16,
+    padding: 16,
+    paddingLeft: 22,
+    marginBottom: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 3,
+    overflow: "hidden",
+    position: "relative",
+  },
+  rideAccentBar: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 6,
   },
   rideTopRow: {
     flexDirection: "row",
@@ -752,6 +810,19 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 0.5,
+  },
+  badgeGrey: {
+    backgroundColor: "#F3F4F6",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#9CA3AF",
+  },
+  badgeTextGrey: {
+    color: "#6B7280",
+    fontSize: 11,
+    fontWeight: "600",
   },
   liveDot: {
     width: 6,

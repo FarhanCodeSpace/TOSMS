@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -10,6 +10,8 @@ import { Text, Card, Avatar } from 'react-native-paper';
 import { db } from '@config/firebase';
 import { COLLECTIONS } from '@config/firebaseCollections';
 import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '@hooks/useAuth';
 import { COLORS, SPACING } from '@constants/theme';
 import MapView, { Marker, Polyline } from 'react-native-maps';
@@ -79,44 +81,56 @@ export const DriverMyRouteScreen: React.FC<DriverMyRouteScreenProps> = ({ naviga
     }
   };
 
-  useEffect(() => {
-    if (baseStudents.length === 0) return;
-    
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().split('T')[0];
-    
-    const unsubscribes: (() => void)[] = [];
-    const statusMap = new Map<string, 'available' | 'unavailable' | 'no-response'>();
+  useFocusEffect(
+    useCallback(() => {
+      if (baseStudents.length === 0) return;
+      const auth = getAuth();
+      
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowStr = tomorrow.toISOString().split('T')[0];
+      
+      const unsubscribes: (() => void)[] = [];
+      const statusMap = new Map<string, 'available' | 'unavailable' | 'no-response'>();
 
-    const updateStudents = () => {
-      setStudents(baseStudents.map(student => ({
-        ...student,
-        availabilityStatus: statusMap.get(student.uid) || 'no-response'
-      })));
-    };
+      const updateStudents = () => {
+        if (!auth.currentUser) return;
+        setStudents(baseStudents.map(student => ({
+          ...student,
+          availabilityStatus: statusMap.get(student.uid) || 'no-response'
+        })));
+      };
 
-    baseStudents.forEach(student => {
-      const availDocId = student.uid + '_' + tomorrowStr;
-      const docRef = doc(db, COLLECTIONS.AVAILABILITY, availDocId);
+      baseStudents.forEach(student => {
+        const availDocId = student.uid + '_' + tomorrowStr;
+        const docRef = doc(db, COLLECTIONS.AVAILABILITY, availDocId);
 
-      const unsub = onSnapshot(docRef, (docSnap) => {
-        if (docSnap.exists()) {
-          const isAvail = docSnap.data().isAvailable;
-          statusMap.set(student.uid, isAvail ? 'available' : 'unavailable');
-        } else {
-          statusMap.set(student.uid, 'no-response');
-        }
-        updateStudents();
+        const unsub = onSnapshot(
+          docRef, 
+          (docSnap) => {
+            if (!auth.currentUser) return;
+            if (docSnap.exists()) {
+              const isAvail = docSnap.data().isAvailable;
+              statusMap.set(student.uid, isAvail ? 'available' : 'unavailable');
+            } else {
+              statusMap.set(student.uid, 'no-response');
+            }
+            updateStudents();
+          },
+          (error: any) => {
+            if (error.code === 'permission-denied') return;
+            console.error("Student availability listener error:", error);
+          }
+        );
+
+        unsubscribes.push(unsub);
       });
 
-      unsubscribes.push(unsub);
-    });
-
-    return () => {
-      unsubscribes.forEach(unsub => unsub());
-    };
-  }, [baseStudents]);
+      return () => {
+        unsubscribes.forEach(unsub => unsub());
+      };
+    }, [baseStudents])
+  );
 
   const fitMapToMarkers = () => {
     if (mapRef.current && route?.stops && route.stops.length > 0) {

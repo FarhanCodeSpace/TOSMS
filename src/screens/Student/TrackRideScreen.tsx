@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   StyleSheet,
@@ -13,9 +13,11 @@ import { Text, Avatar, ActivityIndicator, Button } from "react-native-paper";
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
 import * as Location from "expo-location";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { db } from "@config/firebase";
 import { COLLECTIONS } from "@config/firebaseCollections";
 import { doc, getDoc, onSnapshot } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 import { useAuth } from "@hooks/useAuth";
 import { COLORS, SPACING, FONTS } from "@constants/theme";
 import { StackScreenProps } from "@react-navigation/stack";
@@ -57,6 +59,7 @@ export const TrackRideScreen: React.FC<TrackRideScreenProps> = ({
 }) => {
   const { rideId } = route.params;
   const { currentUser } = useAuth();
+  const insets = useSafeAreaInsets();
 
   // Ride Data State
   const [ride, setRide] = useState<Ride | null>(null);
@@ -79,7 +82,7 @@ export const TrackRideScreen: React.FC<TrackRideScreenProps> = ({
     null,
   );
 
-  // ── ON MOUNT: INITIAL FETCH ──
+  // -- ON MOUNT: INITIAL FETCH --
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -153,7 +156,7 @@ export const TrackRideScreen: React.FC<TrackRideScreenProps> = ({
     ).start();
   }, [rideId]);
 
-  // ── FETCH DRIVER DATA ──
+  // -- FETCH DRIVER DATA --
   useEffect(() => {
     const fetchDriver = async () => {
       const assignedDriverId = ride?.driverId || routeData?.assignedDriverId;
@@ -177,16 +180,22 @@ export const TrackRideScreen: React.FC<TrackRideScreenProps> = ({
     fetchDriver();
   }, [ride?.driverId, routeData?.assignedDriverId]);
 
-  // ── REAL-TIME LISTENERS ──
+  // -- REAL-TIME LISTENERS --
   useEffect(() => {
+    const auth = getAuth();
     // Listener 1: Ride status changes
     const rideUnsub = onSnapshot(
       doc(db, COLLECTIONS.RIDES, rideId),
       (snapshot) => {
+        if (!auth.currentUser) return;
         if (snapshot.exists()) {
           const data = snapshot.data() as Ride;
           setRide(data);
         }
+      },
+      (error: any) => {
+        if (error.code === "permission-denied") return;
+        console.error("Ride listener error:", error);
       },
     );
 
@@ -194,6 +203,7 @@ export const TrackRideScreen: React.FC<TrackRideScreenProps> = ({
     const locationUnsub = onSnapshot(
       doc(db, COLLECTIONS.LIVE_LOCATIONS, rideId),
       (snapshot) => {
+        if (!auth.currentUser) return;
         if (snapshot.exists()) {
           const data = snapshot.data() as LiveLocation;
           setDriverLocation(data);
@@ -239,6 +249,10 @@ export const TrackRideScreen: React.FC<TrackRideScreenProps> = ({
           setDriverLocation(null);
         }
       },
+      (error: any) => {
+        if (error.code === "permission-denied") return;
+        console.error("Location listener error:", error);
+      },
     );
 
     return () => {
@@ -257,12 +271,31 @@ export const TrackRideScreen: React.FC<TrackRideScreenProps> = ({
     );
   }
 
+  // Derived Data
+  const nextStopName =
+    routeData?.stops?.[currentStopIndex]?.stopName || "Final Destination";
+  const effectiveDriverName =
+    ride.driverName ||
+    routeData?.assignedDriverName ||
+    driverData?.fullName ||
+    "Driver";
+  const effectiveVehiclePlate =
+    ride.vehiclePlate || driverData?.vehiclePlate || "N/A";
+  const effectiveDriverPhone = ride.driverPhone || driverData?.phone || "";
+
+  const driverInitials = effectiveDriverName
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .substring(0, 2)
+    .toUpperCase();
+
   // Determine Screen State
   const isCompleted = ride.status === "completed";
-  const isActive = ride.status === "active" && !!driverLocation;
-  const isWaiting = ride.status === "scheduled" || !driverLocation;
+  const isActive = ride.status === "active";
+  const isWaiting = ride.status === "scheduled";
 
-  // ── STATE 3: COMPLETED ──
+  // -- STATE 3: COMPLETED --
   if (isCompleted) {
     return (
       <View style={styles.completedContainer}>
@@ -353,25 +386,7 @@ export const TrackRideScreen: React.FC<TrackRideScreenProps> = ({
     };
   };
 
-  const nextStopName =
-    routeData?.stops?.[currentStopIndex]?.stopName || "Final Destination";
-  const effectiveDriverName =
-    ride.driverName ||
-    routeData?.assignedDriverName ||
-    driverData?.fullName ||
-    "Driver";
-  const effectiveVehiclePlate =
-    ride.vehiclePlate || driverData?.vehiclePlate || "N/A";
-  const effectiveDriverPhone = ride.driverPhone || driverData?.phone || "";
-
-  const driverInitials = effectiveDriverName
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .substring(0, 2)
-    .toUpperCase();
-
-  // ── STATE 1 & 2: RENDER ──
+  // -- STATE 1 & 2: RENDER --
   return (
     <View style={styles.container}>
       <MapView
@@ -431,9 +446,9 @@ export const TrackRideScreen: React.FC<TrackRideScreenProps> = ({
         )}
       </MapView>
 
-      {/* ── STATE 1: WAITING BANNER ── */}
+      {/* -- STATE 1: WAITING BANNER -- */}
       {isWaiting && !isCompleted && (
-        <Animated.View style={[styles.waitingBanner, { opacity: pulseAnim }]}>
+        <Animated.View style={[styles.waitingBanner, { opacity: pulseAnim, top: Math.max(insets.top + 10, 60) }]}>
           <View style={styles.bannerRow}>
             <MaterialCommunityIcons
               name="clock-outline"
@@ -447,7 +462,7 @@ export const TrackRideScreen: React.FC<TrackRideScreenProps> = ({
         </Animated.View>
       )}
 
-      {/* ── STATE 2: ACTIVE INFO CARD ── */}
+      {/* -- STATE 2: ACTIVE INFO CARD -- */}
       {isActive && (
         <View style={styles.infoCard}>
           <View style={styles.handleBar} />
@@ -516,7 +531,7 @@ export const TrackRideScreen: React.FC<TrackRideScreenProps> = ({
 
       {/* Floating Back Button */}
       <TouchableOpacity
-        style={styles.backButton}
+        style={[styles.backButton, { top: Math.max(insets.top, 20) }]}
         onPress={() => navigation.goBack()}
       >
         <MaterialCommunityIcons

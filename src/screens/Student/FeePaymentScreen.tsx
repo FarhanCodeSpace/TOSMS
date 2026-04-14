@@ -17,6 +17,7 @@ import { db } from '@config/firebase';
 import { COLLECTIONS } from '@config/firebaseCollections';
 import { COMPANY_INFO } from '@constants/companyInfo';
 import { collection, query, where, getDocs, doc, setDoc, Timestamp, getDoc, onSnapshot, limit } from 'firebase/firestore';
+import { getAuth } from "firebase/auth";
 import { format } from 'date-fns';
 import * as Clipboard from 'expo-clipboard';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -59,12 +60,17 @@ const FeePaymentScreen: React.FC<FeePaymentScreenProps> = ({ navigation }) => {
         limit(1)
       );
 
+      const auth = getAuth();
       const unsubscribeFee = onSnapshot(feeQuery, (snapshot) => {
+        if (!auth.currentUser) return;
         if (!snapshot.empty) {
           setPaymentStatus({ id: snapshot.docs[0].id, ...snapshot.docs[0].data() });
         } else {
           setPaymentStatus(null);
         }
+      }, (error: any) => {
+        if (error.code === 'permission-denied') return;
+        console.error('Fee status listener error:', error);
       });
 
       // 2. Fetch Route Fee Amount (One-time)

@@ -239,6 +239,7 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
           style={styles.button}
           contentStyle={styles.buttonContent}
           buttonColor={COLORS.primary}
+          textColor={COLORS.onPrimary}
         >
           Register
         </Button>

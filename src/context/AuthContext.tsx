@@ -192,10 +192,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 
   const logout = async () => {
     try {
-      await signOut(auth);
+      // Set currentUser to null first - this triggers isAuthenticated to become false
+      // and React to unmount authenticated screens synchronously
       setCurrentUser(null);
       await saveUserToStorage(null);
+
+      // Small delay to allow React to finish unmounting processes
+      // and useEffect cleanups to fire (unsubscribing Firestore listeners)
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      // Then sign out from Firebase
+      await signOut(auth);
     } catch (error) {
+      console.error("Logout error:", error);
       throw error;
     }
   };

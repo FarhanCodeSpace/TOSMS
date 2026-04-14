@@ -7,6 +7,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { db } from '@config/firebase';
 import { COLLECTIONS } from '@config/firebaseCollections';
 import { doc, getDoc, updateDoc, setDoc, deleteDoc, serverTimestamp, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
+import { getAuth } from "firebase/auth";
 import { useAuth } from '@hooks/useAuth';
 import { COLORS, SPACING } from '@constants/theme';
 import { Route, Ride } from '@types';
@@ -44,6 +45,7 @@ export const ActiveRideScreen: React.FC<any> = ({ route, navigation }) => {
     let isMounted = true;
 
     const initializeRide = async () => {
+      const auth = getAuth();
       try {
         // 1. Fetch Route document for stops and coordinates
         const routeRef = doc(db, COLLECTIONS.ROUTES, routeId);
@@ -83,6 +85,7 @@ export const ActiveRideScreen: React.FC<any> = ({ route, navigation }) => {
             const unsub = onSnapshot(
               doc(db, COLLECTIONS.AVAILABILITY, availDocId),
               (snap) => {
+                if (!auth.currentUser) return;
                 if (snap.exists()) {
                   const data = snap.data();
                   boardedMap[sid] = data.boarded === true;
@@ -91,6 +94,10 @@ export const ActiveRideScreen: React.FC<any> = ({ route, navigation }) => {
                 }
                 const count = Object.values(boardedMap).filter(Boolean).length;
                 if (isMounted) setTodayAvailableCount(count);
+              },
+              (error: any) => {
+                if (error.code === 'permission-denied') return;
+                console.error("Student availability listener error:", error);
               }
             );
             availUnsubscribers.push(unsub);

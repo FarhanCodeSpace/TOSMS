@@ -11,6 +11,8 @@ import {
   setupNotificationListeners,
   arePushNotificationsSupported,
 } from "../services/notificationService";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "@config/firebase";
 import InAppNotificationBanner from "../components/common/InAppNotificationBanner";
 import { navigationRef } from "./navigationRef";
 
@@ -33,6 +35,18 @@ export const RootNavigator = () => {
       return () => cleanup();
     }
   }, [isAuthenticated, currentUser?.uid]);
+
+  // Handle global auth state changes
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (!firebaseUser) {
+        // User logged out - navigation will automatically switch to AuthNavigator
+        // because isAuthenticated is false in context
+        // This ensures a clean reset of navigation state
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   if (isLoading) {
     return (

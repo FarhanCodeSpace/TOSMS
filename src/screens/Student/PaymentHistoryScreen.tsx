@@ -14,6 +14,7 @@ import { COLORS } from '@constants/theme';
 import { db } from '@config/firebase';
 import { COLLECTIONS } from '@config/firebaseCollections';
 import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
+import { getAuth } from "firebase/auth";
 import { format } from 'date-fns';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { StudentHomeStackParamList } from '@navigation/types';
@@ -43,11 +44,14 @@ const PaymentHistoryScreen: React.FC<PaymentHistoryScreenProps> = ({ navigation 
       orderBy('submittedAt', 'desc')
     );
 
+    const auth = getAuth();
     const unsubscribe = onSnapshot(paymentsQuery, (snapshot) => {
+      if (!auth.currentUser) return;
       const p = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setPayments(p);
       setLoading(false);
-    }, (error) => {
+    }, (error: any) => {
+      if (error.code === 'permission-denied') return;
       console.error('Error fetching payments:', error);
       setLoading(false);
     });

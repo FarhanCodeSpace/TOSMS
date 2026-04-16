@@ -5,7 +5,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  ActivityIndicator,
 } from 'react-native';
 import { Text, Button } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
@@ -15,58 +14,17 @@ import { db } from '@config/firebase';
 import { COLLECTIONS } from '@config/firebaseCollections';
 import { COMPANY_INFO } from '@constants/companyInfo';
 import { doc, getDoc } from 'firebase/firestore';
-import { format } from 'date-fns';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RouteProp } from '@react-navigation/native';
 import { StudentHomeStackParamList } from '@navigation/types';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
+import LoadingSpinner from '@components/common/LoadingSpinner';
+import { amountInWords, formatMonth } from '@utils/formatters';
 
 type ChallanViewScreenProps = {
   navigation: StackNavigationProp<StudentHomeStackParamList, 'ChallanView'>;
   route: RouteProp<StudentHomeStackParamList, 'ChallanView'>;
-};
-
-// Helper for Amount in Words
-const amountInWords = (amount: number): string => {
-  if (amount === 0) return 'Zero Rupees Only';
-  const units = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
-  const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
-  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
-  
-  let words = '';
-  
-  if (amount >= 1000) {
-    const thousand = Math.floor(amount / 1000);
-    if (thousand >= 10 && thousand < 20) {
-      words += teens[thousand - 10] + ' Thousand ';
-    } else {
-      const tTens = Math.floor(thousand / 10);
-      const tUnits = thousand % 10;
-      if (tTens > 0) words += tens[tTens] + ' ';
-      if (tUnits > 0) words += units[tUnits] + ' ';
-      words += 'Thousand ';
-    }
-    amount %= 1000;
-  }
-  
-  if (amount >= 100) {
-    words += units[Math.floor(amount / 100)] + ' Hundred ';
-    amount %= 100;
-  }
-  
-  if (amount > 0) {
-    if (amount >= 10 && amount < 20) {
-      words += teens[amount - 10] + ' ';
-    } else {
-      const tTens = Math.floor(amount / 10);
-      const tUnits = amount % 10;
-      if (tTens > 0) words += tens[tTens] + ' ';
-      if (tUnits > 0) words += units[tUnits] + ' ';
-    }
-  }
-  
-  return words.trim() + ' Rupees Only';
 };
 
 const ChallanViewScreen: React.FC<ChallanViewScreenProps> = ({ navigation, route }) => {
@@ -89,8 +47,7 @@ const ChallanViewScreen: React.FC<ChallanViewScreenProps> = ({ navigation, route
         Alert.alert('Error', 'Challan not found');
         navigation.goBack();
       }
-    } catch (error) {
-      console.error('Error fetching challan:', error);
+    } catch {
       Alert.alert('Error', 'Failed to fetch challan details.');
     } finally {
       setLoading(false);
@@ -112,23 +69,18 @@ const ChallanViewScreen: React.FC<ChallanViewScreenProps> = ({ navigation, route
           Alert.alert('Error', 'Sharing is not available on this device');
         }
       }
-    } catch (error) {
-      console.error('Error sharing challan:', error);
+    } catch {
       Alert.alert('Error', 'Failed to share challan slip.');
     }
   };
 
   if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-      </View>
-    );
+    return <LoadingSpinner />;
   }
 
   if (!challan) return null;
 
-  const currentMonthDisplay = format(new Date(challan.month + '-01'), 'MMMM yyyy');
+  const currentMonthDisplay = formatMonth(challan.month);
 
   return (
     <View style={styles.container}>

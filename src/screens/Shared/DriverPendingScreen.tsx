@@ -23,8 +23,8 @@ const DriverPendingScreen: React.FC = () => {
               updateUser({ approved: true });
             }
           }
-        } catch (error) {
-          console.error('Error checking approval status:', error);
+        } catch {
+          // silently handle error
         }
       }
     };
@@ -40,8 +40,8 @@ const DriverPendingScreen: React.FC = () => {
           approved: true,
         });
         updateUser({ approved: true });
-      } catch (error) {
-        console.error('Error auto-approving:', error);
+      } catch {
+          // silently handle error
       }
     }
   };

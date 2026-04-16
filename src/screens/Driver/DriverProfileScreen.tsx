@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Alert, Image, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { Text, Divider } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { db } from '@config/firebase';
@@ -8,7 +8,7 @@ import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { useAuth } from '@hooks/useAuth';
 import { COLORS, FONTS } from '@constants/theme';
 import { formatDistanceToNow, format } from 'date-fns';
-import { TouchableOpacity } from 'react-native-gesture-handler';
+import AvatarComponent from '@components/common/Avatar';
 
 const getInitials = (name: string): string => {
   if (!name) return '';
@@ -51,8 +51,8 @@ export const DriverProfileScreen: React.FC = () => {
         );
         const snap = await getDocs(q);
         setTotalRides(snap.size);
-      } catch (error) {
-        console.error('Error fetching driver stats:', error);
+      } catch {
+        // silently handle stats error
       }
     };
 
@@ -70,8 +70,8 @@ export const DriverProfileScreen: React.FC = () => {
         } else {
           setRoute(null);
         }
-      } catch (error) {
-        console.error('Error fetching driver route:', error);
+      } catch {
+        // silently handle route error
       } finally {
         setLoadingRoute(false);
       }
@@ -103,13 +103,11 @@ export const DriverProfileScreen: React.FC = () => {
     <ScrollView style={styles.container}>
       {/* Header Section */}
       <View style={styles.header}>
-        {avatarSource ? (
-          <Image source={{ uri: avatarSource }} style={styles.avatar} />
-        ) : (
-          <View style={styles.avatarFallback}>
-            <Text style={styles.avatarInitials}>{getInitials(currentUser?.fullName || '')}</Text>
-          </View>
-        )}
+        <AvatarComponent
+          imageUrl={avatarSource}
+          name={currentUser?.fullName || ''}
+          size={88}
+        />
         <Text style={styles.fullName}>{currentUser?.fullName}</Text>
         
         <View style={styles.contactRow}>

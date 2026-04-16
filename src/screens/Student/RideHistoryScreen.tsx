@@ -1,16 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
-import { Text, Card, Chip } from 'react-native-paper';
+import { View, StyleSheet, FlatList } from 'react-native';
+import { Text, Card } from 'react-native-paper';
 import { db } from '@config/firebase';
 import { COLLECTIONS } from '@config/firebaseCollections';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '@hooks/useAuth';
 import { COLORS, SPACING, FONTS } from '@constants/theme';
-import { format, parseISO } from 'date-fns';
 import { getDoc, doc } from 'firebase/firestore';
 import { Availability } from '../../types';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { getAuth } from "firebase/auth";
+import LoadingSpinner from '@components/common/LoadingSpinner';
+import EmptyState from '@components/common/EmptyState';
+import StatusBadge from '@components/common/StatusBadge';
+import { formatDate } from '@utils/formatters';
+import { getPakistanTodayString } from '@utils/dateHelpers';
 
 interface AvailabilityWithId extends Availability {
   availabilityId: string;
@@ -33,8 +37,8 @@ export const RideHistoryScreen: React.FC = () => {
         if (routeSnap.exists()) {
           setRouteName(routeSnap.data().routeName);
         }
-      } catch (err) {
-        console.error('Error fetching route:', err);
+      } catch {
+      // silently handle route fetch error
       }
     };
     fetchRoute();
@@ -43,7 +47,7 @@ export const RideHistoryScreen: React.FC = () => {
   useEffect(() => {
     if (!currentUser?.uid) return;
 
-    const today = format(new Date(), 'yyyy-MM-dd');
+    const today = getPakistanTodayString();
     const q = query(
       collection(db, COLLECTIONS.AVAILABILITY),
       where('userId', '==', currentUser.uid),
@@ -65,7 +69,6 @@ export const RideHistoryScreen: React.FC = () => {
       },
       (error: any) => {
         if (error.code === 'permission-denied') return;
-        console.error("Ride history listener error:", error);
         setLoading(false);
       }
     );
@@ -81,34 +84,20 @@ export const RideHistoryScreen: React.FC = () => {
         <View style={styles.cardRow}>
           <View>
             <Text style={styles.dateText}>
-              {format(parseISO(item.date), 'EEEE, MMM d, yyyy')}
+              {formatDate(item.date)}
             </Text>
             <Text style={styles.routeText}>
               {routeName}
             </Text>
           </View>
-          <View style={[
-            styles.statusBadge,
-            { backgroundColor: item.isAvailable ? '#DCFCE7' : '#F3F4F6' }
-          ]}>
-            <Text style={[
-              styles.statusText,
-              { color: item.isAvailable ? '#16A34A' : '#6B7280' }
-            ]}>
-              {item.isAvailable ? 'Rode ✓' : 'Did Not Ride'}
-            </Text>
-          </View>
+          <StatusBadge status={item.isAvailable ? 'available' : 'unavailable'} size="sm" />
         </View>
       </Card.Content>
     </Card>
   );
 
   if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-      </View>
-    );
+    return <LoadingSpinner />;
   }
 
   return (
@@ -124,11 +113,11 @@ export const RideHistoryScreen: React.FC = () => {
         renderItem={renderItem}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <MaterialCommunityIcons name="history" size={48} color="#D1D5DB" />
-            <Text style={styles.emptyTitle}>No ride history yet</Text>
-            <Text style={styles.emptySubtitle}>Your availability history will appear here.</Text>
-          </View>
+          <EmptyState
+            iconName="history"
+            title="No ride history yet"
+            subtitle="Your availability history will appear here."
+          />
         }
       />
     </View>

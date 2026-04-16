@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, FlatList, Animated, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { Text, Searchbar, Avatar } from 'react-native-paper';
+import { View, StyleSheet, FlatList, Animated, TouchableOpacity } from 'react-native';
+import { Text, Searchbar } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Swipeable, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { db } from '@config/firebase';
@@ -10,6 +10,9 @@ import { getAuth } from "firebase/auth";
 import { COLORS, SPACING } from '@constants/theme';
 import { getPakistanTodayString } from '@utils/dateHelpers';
 import { Route, User, Availability } from '@types';
+import LoadingSpinner from '@components/common/LoadingSpinner';
+import EmptyState from '@components/common/EmptyState';
+import AvatarComponent from '@components/common/Avatar';
 
 interface StudentWithAvailability {
   uid: string;
@@ -75,15 +78,13 @@ export const PassengersScreen: React.FC<any> = ({ route, navigation }) => {
             },
             (error: any) => {
               if (error.code === 'permission-denied') return;
-              console.error("Student availability listener error:", error);
             }
           );
           unsubscribers.push(unsub);
         });
 
         setIsLoading(false);
-      } catch (error) {
-        console.error('Error:', error);
+      } catch {
         setIsLoading(false);
       }
     };
@@ -118,12 +119,11 @@ export const PassengersScreen: React.FC<any> = ({ route, navigation }) => {
           role: 'student'
         });
       }
-      console.log('Boarded marked for:', studentUid);
       setTimeout(() => {
         swipeableRefs.current[studentUid]?.close();
       }, 300);
-    } catch (error) {
-      console.error('Error marking boarded:', error);
+    } catch {
+      // silently handle error
     }
   };
 
@@ -226,10 +226,10 @@ export const PassengersScreen: React.FC<any> = ({ route, navigation }) => {
         }}
       >
         <View style={[styles.studentCard, isBoarded && styles.studentCardBoarded]}>
-          <Avatar.Text
+          <AvatarComponent
+            name={item.fullName}
             size={42}
-            label={getInitials(item.fullName)}
-            style={{ backgroundColor: isBoarded ? COLORS.success : COLORS.primary }}
+            imageUrl={undefined}
           />
           <View style={styles.studentInfo}>
             <Text style={styles.studentName} numberOfLines={1}>{item.fullName}</Text>
@@ -299,9 +299,7 @@ export const PassengersScreen: React.FC<any> = ({ route, navigation }) => {
 
       {/* Student List */}
       {isLoading ? (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-        </View>
+        <LoadingSpinner />
       ) : (
         <FlatList
           data={filteredStudents}
@@ -309,10 +307,11 @@ export const PassengersScreen: React.FC<any> = ({ route, navigation }) => {
           renderItem={renderItem}
           contentContainerStyle={styles.listContainer}
           ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <MaterialCommunityIcons name="account-off" size={48} color={COLORS.textSecondary} style={{ opacity: 0.3 }} />
-              <Text style={styles.emptyText}>No passengers found</Text>
-            </View>
+            <EmptyState
+              iconName="account-group-outline"
+              title="No passengers found"
+              subtitle="No students matched your search."
+            />
           }
         />
       )}

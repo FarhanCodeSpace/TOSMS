@@ -23,15 +23,9 @@ import { COLORS, SPACING, FONTS } from '@constants/theme';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StackScreenProps } from '@react-navigation/stack';
 import { StudentProfileStackParamList } from '@navigation/types';
+import AvatarComponent from '@components/common/Avatar';
 
 type EditProfileScreenProps = StackScreenProps<StudentProfileStackParamList, 'EditProfile'>;
-
-const getInitials = (name: string): string => {
-  const parts = name.trim().split(' ');
-  const first = parts[0]?.[0] || '';
-  const last = parts[parts.length - 1]?.[0] || '';
-  return (first + last).toUpperCase();
-};
 
 export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation }) => {
   const { currentUser, updateUser } = useAuth();
@@ -74,8 +68,7 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation
       updateUser(updatedData);
       Alert.alert('Success', 'Profile updated successfully!');
       navigation.goBack();
-    } catch (error) {
-      console.error('Error updating profile:', error);
+    } catch {
       Alert.alert('Error', 'Failed to update profile. Please try again.');
     } finally {
       setIsSaving(false);
@@ -110,17 +103,14 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation
         {/* Avatar Picker */}
         <View style={styles.avatarSection}>
           <TouchableOpacity onPress={handlePickImage}>
-            {avatarSource ? (
-              <Image source={{ uri: avatarSource }} style={styles.avatar} />
-            ) : (
-              <View style={styles.avatarFallback}>
-                <Text style={styles.avatarInitials}>
-                  {getInitials(currentUser?.fullName || '')}
-                </Text>
-              </View>
-            )}
+            <AvatarComponent
+              imageUrl={avatarSource || undefined}
+              name={currentUser?.fullName || ''}
+              size={100}
+              onPress={handlePickImage}
+            />
             <View style={styles.editBadge}>
-              <Text style={styles.editBadgeText}>📷</Text>
+              <MaterialCommunityIcons name="camera" size={14} color="white" />
             </View>
           </TouchableOpacity>
           <Text style={styles.changePhotoText}>Tap to change photo</Text>

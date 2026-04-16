@@ -4,6 +4,7 @@ import { TextInput, Button, Text, HelperText, Snackbar } from 'react-native-pape
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '@config/firebase';
 import { COLORS, SPACING } from '@constants/theme';
+import { handleFirebaseError } from '@utils/errorHandler';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { AuthStackParamList } from '@navigation/types';
 
@@ -30,17 +31,7 @@ const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({ navigation 
       await sendPasswordResetEmail(auth, email);
       setVisible(true);
     } catch (err: any) {
-      console.error('Reset error:', err.code);
-      switch (err.code) {
-        case 'auth/user-not-found':
-          setError('No account found with this email');
-          break;
-        case 'auth/invalid-email':
-          setError('Invalid email address format');
-          break;
-        default:
-          setError('Failed to send reset email. Please try again.');
-      }
+      setError(handleFirebaseError(err.code));
     } finally {
       setIsLoading(false);
     }

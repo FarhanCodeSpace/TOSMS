@@ -13,6 +13,7 @@ import { StackNavigationProp } from "@react-navigation/stack";
 import { RouteProp } from "@react-navigation/native";
 import { AuthStackParamList } from "@navigation/types";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { handleFirebaseError } from "@utils/errorHandler";
 
 type LoginScreenProps = {
   navigation: StackNavigationProp<AuthStackParamList, "Login">;
@@ -52,26 +53,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation, route }) => {
       }, 5000);
     } catch (err: any) {
       setIsLoading(false);
-      console.error("Login error:", err.code);
-      switch (err.code) {
-        case "auth/invalid-email":
-          setError("Invalid email address format");
-          break;
-        case "auth/user-not-found":
-          setError("No account found with this email");
-          break;
-        case "auth/wrong-password":
-          setError("Incorrect password");
-          break;
-        case "auth/too-many-requests":
-          setError("Too many attempts. Try again later");
-          break;
-        case "auth/network-request-failed":
-          setError("No internet connection");
-          break;
-        default:
-          setError("An unexpected error occurred. Please try again.");
-      }
+      setError(handleFirebaseError(err.code));
     }
   };
 

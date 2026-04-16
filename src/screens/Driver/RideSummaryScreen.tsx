@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { Text, Button, Card } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { db } from '@config/firebase';
@@ -9,8 +9,9 @@ import { COLORS, SPACING } from '@constants/theme';
 import { StackScreenProps } from '@react-navigation/stack';
 import { DriverActiveRideStackParamList } from '@navigation/types';
 import { Ride } from '@types';
-import { format } from 'date-fns';
+import { formatDate } from '@utils/formatters';
 import { CommonActions } from '@react-navigation/native';
+import LoadingSpinner from '@components/common/LoadingSpinner';
 
 type RideSummaryScreenProps = StackScreenProps<DriverActiveRideStackParamList, 'RideSummary'>;
 
@@ -27,8 +28,8 @@ export const RideSummaryScreen: React.FC<any> = ({ route, navigation }) => {
         if (rideSnap.exists()) {
           setRide(rideSnap.data() as Ride);
         }
-      } catch (error) {
-        console.error('Error fetching completed ride:', error);
+      } catch {
+        // silently handle error
       } finally {
         setLoading(false);
       }
@@ -50,17 +51,12 @@ export const RideSummaryScreen: React.FC<any> = ({ route, navigation }) => {
   };
 
   if (loading || !ride) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={{ marginTop: SPACING.md }}>Loading Final Details...</Text>
-      </View>
-    );
+    return <LoadingSpinner message="Loading Final Details..." />;
   }
 
   const boardedCount = ride.boardedCount !== undefined ? ride.boardedCount : (ride.completedStudentIds?.length || 0);
 
-  const dateStr = ride.date ? format(new Date(ride.date), 'MMM d, yyyy') : String(ride.departureTime || '--');
+  const dateStr = ride.date ? formatDate(ride.date) : String(ride.departureTime || '--');
 
   return (
     <View style={styles.container}>

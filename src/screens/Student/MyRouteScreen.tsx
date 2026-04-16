@@ -3,11 +3,10 @@ import {
   View,
   StyleSheet,
   ScrollView,
-  ActivityIndicator,
   Linking,
   TouchableOpacity,
 } from 'react-native';
-import { Text, Card, Avatar, Button } from 'react-native-paper';
+import { Text, Card, Button } from 'react-native-paper';
 import { db } from '@config/firebase';
 import { COLLECTIONS } from '@config/firebaseCollections';
 import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
@@ -21,6 +20,9 @@ import { Route, User, RideStop } from '../../types';
 import { format } from 'date-fns';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { StudentHomeStackParamList } from '@navigation/types';
+import LoadingSpinner from '@components/common/LoadingSpinner';
+import AvatarComponent from '@components/common/Avatar';
+import { formatPKR } from '@utils/formatters';
 
 type MyRouteScreenProps = {
   navigation: StackNavigationProp<StudentHomeStackParamList, 'MyRoute'>;
@@ -74,8 +76,8 @@ const MyRouteScreen: React.FC<MyRouteScreenProps> = ({ navigation }) => {
                 if (driverDoc.exists() && auth.currentUser) {
                   setDriver(driverDoc.data() as User);
                 }
-              } catch (err) {
-                console.error("Error fetching driver info:", err);
+              } catch {
+              // silently handle driver fetch error
               }
             }
           }
@@ -83,7 +85,6 @@ const MyRouteScreen: React.FC<MyRouteScreenProps> = ({ navigation }) => {
         },
         (error: any) => {
           if (error.code === "permission-denied") return;
-          console.error("Route listener error:", error);
           setIsLoading(false);
         },
       );
@@ -107,7 +108,6 @@ const MyRouteScreen: React.FC<MyRouteScreenProps> = ({ navigation }) => {
         },
         (error: any) => {
           if (error.code === "permission-denied") return;
-          console.error("Availability list listener error:", error);
         },
       );
       cleanups.push(unsubAvail);
@@ -133,11 +133,7 @@ const MyRouteScreen: React.FC<MyRouteScreenProps> = ({ navigation }) => {
   };
 
   if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-      </View>
-    );
+    return <LoadingSpinner />;
   }
 
   if (!route) {
@@ -216,16 +212,11 @@ const MyRouteScreen: React.FC<MyRouteScreenProps> = ({ navigation }) => {
             <Card style={styles.driverCard} elevation={0}>
               <View style={styles.driverRow}>
                 <View style={styles.avatarContainer}>
-                  {driver.profileImageUrl ? (
-                    <Avatar.Image size={56} source={{ uri: driver.profileImageUrl }} />
-                  ) : (
-                    <Avatar.Text 
-                      size={56} 
-                      label={driver.fullName.substring(0, 2).toUpperCase()} 
-                      style={{backgroundColor: '#E5E7EB'}} 
-                      labelStyle={{color: COLORS.primary, fontWeight: '700'}}
-                    />
-                  )}
+                  <AvatarComponent
+                    imageUrl={driver.profileImageUrl}
+                    name={driver.fullName}
+                    size={56}
+                  />
                 </View>
                 <View style={styles.driverInfo}>
                   <Text style={styles.driverName}>{driver.fullName}</Text>
@@ -269,7 +260,7 @@ const MyRouteScreen: React.FC<MyRouteScreenProps> = ({ navigation }) => {
                 <View style={styles.detailBox}>
                     <MaterialCommunityIcons name="cash" size={22} color={COLORS.primary} />
                     <Text style={styles.detailLabel}>Monthly Fee</Text>
-                    <Text style={styles.detailValue}>{route.feeAmount}</Text>
+                    <Text style={styles.detailValue}>{formatPKR(route.feeAmount || 0)}</Text>
                 </View>
             </View>
         </View>

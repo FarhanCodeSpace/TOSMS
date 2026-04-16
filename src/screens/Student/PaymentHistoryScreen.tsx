@@ -4,7 +4,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   Modal,
 } from 'react-native';
 import { Text, Portal, Button } from 'react-native-paper';
@@ -15,16 +14,15 @@ import { db } from '@config/firebase';
 import { COLLECTIONS } from '@config/firebaseCollections';
 import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
 import { getAuth } from "firebase/auth";
-import { format } from 'date-fns';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { StudentHomeStackParamList } from '@navigation/types';
+import LoadingSpinner from '@components/common/LoadingSpinner';
+import EmptyState from '@components/common/EmptyState';
+import StatusBadge from '@components/common/StatusBadge';
+import { formatPKR, formatMonth, formatDate } from '@utils/formatters';
 
 type PaymentHistoryScreenProps = {
   navigation: StackNavigationProp<StudentHomeStackParamList, 'PaymentHistory'>;
-};
-
-const formatPKR = (amount: number) => {
-  return new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', minimumFractionDigits: 0 }).format(amount);
 };
 
 const PaymentHistoryScreen: React.FC<PaymentHistoryScreenProps> = ({ navigation }) => {
@@ -52,7 +50,6 @@ const PaymentHistoryScreen: React.FC<PaymentHistoryScreenProps> = ({ navigation 
       setLoading(false);
     }, (error: any) => {
       if (error.code === 'permission-denied') return;
-      console.error('Error fetching payments:', error);
       setLoading(false);
     });
 
@@ -84,11 +81,7 @@ const PaymentHistoryScreen: React.FC<PaymentHistoryScreenProps> = ({ navigation 
   };
 
   if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-      </View>
-    );
+    return <LoadingSpinner />;
   }
 
   return (
@@ -111,24 +104,24 @@ const PaymentHistoryScreen: React.FC<PaymentHistoryScreenProps> = ({ navigation 
           </View>
           <View style={styles.statCard}>
             <Icon name="cash-multiple" size={24} color={COLORS.primary} />
-            <Text style={[styles.statValue, { color: COLORS.primary }]}>{formatPKR(totalPaid).replace('PKR\xa0', '')}</Text>
+            <Text style={[styles.statValue, { color: COLORS.primary }]}>{formatPKR(totalPaid)}</Text>
             <Text style={styles.statLabel}>Total Paid</Text>
           </View>
         </View>
 
         {payments.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Icon name="receipt" size={64} color="#D1D5DB" />
-            <Text style={styles.emptyTitle}>No Payment History</Text>
-            <Text style={styles.emptyText}>Your payment records will appear here.</Text>
-          </View>
+          <EmptyState
+            iconName="receipt"
+            title="No Payment History"
+            subtitle="Your payment records will appear here."
+          />
         ) : (
           payments.map(payment => {
             const isBank = payment.paymentMethod === 'bank_challan';
             const iconName = isBank ? 'bank' : 'cellphone';
             const iconColor = isBank ? '#3B82F6' : '#8B5CF6';
             const methodName = isBank ? 'Bank Challan' : (payment.paymentMethod === 'easypaisa' ? 'EasyPaisa' : 'JazzCash');
-            const monthDisplay = format(new Date(payment.month + '-01'), 'MMMM yyyy');
+            const monthDisplay = formatMonth(payment.month);
 
             return (
               <TouchableOpacity
@@ -147,12 +140,8 @@ const PaymentHistoryScreen: React.FC<PaymentHistoryScreenProps> = ({ navigation 
                   </View>
                 </View>
                 <View style={styles.paymentRight}>
-                  <Text style={styles.amountText}>PKR {payment.amount}</Text>
-                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(payment.paymentStatus) + '15' }]}>
-                    <Text style={[styles.statusText, { color: getStatusColor(payment.paymentStatus) }]}>
-                      {getStatusText(payment.paymentStatus)}
-                    </Text>
-                  </View>
+                  <Text style={styles.amountText}>{formatPKR(payment.amount)}</Text>
+                  <StatusBadge status={payment.paymentStatus === 'verified' ? 'verified' : payment.paymentStatus === 'submitted' ? 'submitted' : 'pending'} size="sm" />
                 </View>
               </TouchableOpacity>
             );
@@ -181,7 +170,7 @@ const PaymentHistoryScreen: React.FC<PaymentHistoryScreenProps> = ({ navigation 
                 <View style={styles.modalBody}>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Month</Text>
-                    <Text style={styles.detailValue}>{format(new Date(selectedPayment.month + '-01'), 'MMMM yyyy')}</Text>
+                    <Text style={styles.detailValue}>{formatMonth(selectedPayment.month)}</Text>
                   </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Method</Text>
@@ -192,7 +181,7 @@ const PaymentHistoryScreen: React.FC<PaymentHistoryScreenProps> = ({ navigation 
                   </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Amount</Text>
-                    <Text style={[styles.detailValue, { color: COLORS.primary }]}>PKR {selectedPayment.amount}</Text>
+                    <Text style={styles.detailValue}>{formatPKR(selectedPayment.amount)}</Text>
                   </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>
@@ -205,7 +194,7 @@ const PaymentHistoryScreen: React.FC<PaymentHistoryScreenProps> = ({ navigation 
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Verified On</Text>
                     <Text style={styles.detailValue}>
-                      {selectedPayment.verifiedAt ? format(selectedPayment.verifiedAt.toDate(), 'PPP p') : 'Pending'}
+                      {selectedPayment.verifiedAt ? formatDate(selectedPayment.verifiedAt) : 'Pending'}
                     </Text>
                   </View>
                   

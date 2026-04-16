@@ -3,10 +3,9 @@ import {
   View,
   StyleSheet,
   ScrollView,
-  ActivityIndicator,
   TouchableOpacity,
 } from 'react-native';
-import { Text, Card, Avatar } from 'react-native-paper';
+import { Text, Card } from 'react-native-paper';
 import { db } from '@config/firebase';
 import { COLLECTIONS } from '@config/firebaseCollections';
 import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
@@ -19,6 +18,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Route, User, RideStop } from '../../types';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { DriverHomeStackParamList } from '@navigation/types';
+import LoadingSpinner from '@components/common/LoadingSpinner';
+import AvatarComponent from '@components/common/Avatar';
 
 type DriverMyRouteScreenProps = {
   navigation: StackNavigationProp<DriverHomeStackParamList, 'DriverHome'>;
@@ -74,8 +75,8 @@ export const DriverMyRouteScreen: React.FC<DriverMyRouteScreenProps> = ({ naviga
           setBaseStudents(studentsData);
         }
       }
-    } catch (error) {
-      console.error("Error fetching driver route data:", error);
+    } catch {
+      // silently handle error
     } finally {
       setIsLoading(false);
     }
@@ -119,7 +120,6 @@ export const DriverMyRouteScreen: React.FC<DriverMyRouteScreenProps> = ({ naviga
           },
           (error: any) => {
             if (error.code === 'permission-denied') return;
-            console.error("Student availability listener error:", error);
           }
         );
 
@@ -143,11 +143,7 @@ export const DriverMyRouteScreen: React.FC<DriverMyRouteScreenProps> = ({ naviga
   };
 
   if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-      </View>
-    );
+    return <LoadingSpinner />;
   }
 
   if (!route) {
@@ -248,16 +244,11 @@ export const DriverMyRouteScreen: React.FC<DriverMyRouteScreenProps> = ({ naviga
             <Card key={student.uid} style={styles.passengerCard} elevation={0}>
               <View style={styles.passengerRow}>
                 <View style={styles.avatarContainer}>
-                  {student.profileImageUrl ? (
-                    <Avatar.Image size={48} source={{ uri: student.profileImageUrl }} />
-                  ) : (
-                    <Avatar.Text 
-                      size={48} 
-                      label={student.fullName.split(' ').map(n=>n[0]).join('').substring(0,2)} 
-                      style={{backgroundColor: '#E5E7EB'}} 
-                      labelStyle={{color: COLORS.primary, fontWeight: '700'}}
-                    />
-                  )}
+                  <AvatarComponent
+                    imageUrl={student.profileImageUrl}
+                    name={student.fullName}
+                    size={48}
+                  />
                   <View style={[styles.statusIndicator, { backgroundColor: student.availabilityStatus === 'available' ? '#16A34A' : (student.availabilityStatus === 'unavailable' ? '#DC2626' : '#9CA3AF') }]} />
                 </View>
                 

@@ -6,9 +6,8 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
-  ActivityIndicator,
 } from "react-native";
-import { Text, Avatar, Button } from "react-native-paper";
+import { Text, Button } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { db } from "@config/firebase";
 import { COLLECTIONS } from "@config/firebaseCollections";
@@ -27,6 +26,7 @@ import { StackScreenProps } from "@react-navigation/stack";
 import { StudentHomeStackParamList } from "@navigation/types";
 import { CommonActions } from "@react-navigation/native";
 import { User } from "@types";
+import AvatarComponent from '@components/common/Avatar';
 
 type ReviewScreenProps = StackScreenProps<StudentHomeStackParamList, "Review">;
 
@@ -59,8 +59,8 @@ export const ReviewScreen: React.FC<ReviewScreenProps> = ({
           if (snap.exists()) {
             setDriverData(snap.data() as User);
           }
-        } catch (error) {
-          console.error("Error fetching driver for review:", error);
+        } catch {
+          // silently handle error
         }
       }
     };
@@ -69,12 +69,6 @@ export const ReviewScreen: React.FC<ReviewScreenProps> = ({
 
   const handleSubmit = async () => {
     if (rating === 0 || !driverId || !rideId || isSubmitting) {
-      console.warn("Missing required review data or already submitting:", {
-        rating,
-        driverId,
-        rideId,
-        isSubmitting,
-      });
       return;
     }
 
@@ -136,8 +130,7 @@ export const ReviewScreen: React.FC<ReviewScreenProps> = ({
         ],
         { cancelable: false },
       );
-    } catch (error) {
-      console.error("Error submitting review:", error);
+    } catch {
       Alert.alert("Error", "Failed to submit review. Please try again.");
       setIsSubmitting(false);
     }
@@ -171,18 +164,11 @@ export const ReviewScreen: React.FC<ReviewScreenProps> = ({
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.driverCard}>
-          {driverData?.profileImageUrl ? (
-            <Avatar.Image
-              size={64}
-              source={{ uri: driverData.profileImageUrl }}
-            />
-          ) : (
-            <Avatar.Text
-              size={64}
-              label={initials}
-              style={{ backgroundColor: COLORS.primary }}
-            />
-          )}
+          <AvatarComponent
+            imageUrl={driverData?.profileImageUrl}
+            name={displayName}
+            size={64}
+          />
           <Text style={styles.driverName}>{displayName}</Text>
           <Text style={styles.subText}>How was your ride?</Text>
         </View>
@@ -222,25 +208,9 @@ export const ReviewScreen: React.FC<ReviewScreenProps> = ({
           buttonColor={COLORS.primary}
         >
           {isSubmitting ? (
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                opacity: 0.8,
-              }}
-            >
-              <ActivityIndicator color="white" size="small" />
-              <Text
-                style={{
-                  color: "white",
-                  fontWeight: "700",
-                  fontSize: 16,
-                  marginLeft: 10,
-                }}
-              >
-                Submitting...
-              </Text>
-            </View>
+            <Text style={{ color: 'white', fontWeight: '700', fontSize: 16 }}>
+              Submitting...
+            </Text>
           ) : (
             <Text style={{ color: "white", fontWeight: "700", fontSize: 16 }}>
               Submit Review

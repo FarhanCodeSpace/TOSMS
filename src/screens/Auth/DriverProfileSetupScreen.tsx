@@ -5,7 +5,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  ActivityIndicator,
   Platform,
   KeyboardAvoidingView,
 } from "react-native";
@@ -25,6 +24,7 @@ import { uploadFileToStorage } from "@utils/imageUtils";
 import { COLORS, SPACING } from "@constants/theme";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { AuthStackParamList } from "@navigation/types";
+import { handleFirebaseError } from "@utils/errorHandler";
 
 type DriverProfileSetupScreenProps = {
   navigation: StackNavigationProp<
@@ -122,8 +122,7 @@ const DriverProfileSetupScreen: React.FC<DriverProfileSetupScreenProps> = ({
         navigation.navigate("DriverPending");
       }
     } catch (err: any) {
-      console.error("Driver setup error:", err);
-      setError(`Failed to update profile: ${err.message || "Unknown error"}`);
+      setError(handleFirebaseError(err.code) || 'Failed to update profile.');
     } finally {
       setIsLoading(false);
     }

@@ -5,9 +5,9 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  ActivityIndicator,
   Image,
   TextInput,
+  ActivityIndicator,
   Platform,
   KeyboardAvoidingView,
 } from 'react-native';
@@ -51,8 +51,7 @@ const ChallanDepositScreen: React.FC<ChallanDepositScreenProps> = ({ navigation,
       if (!result.canceled && result.assets && result.assets.length > 0) {
         setImageUri(result.assets[0].uri);
       }
-    } catch (error) {
-      console.error('Error picking image:', error);
+    } catch {
       Alert.alert('Error', 'Failed to pick image from library');
     }
   };
@@ -116,8 +115,7 @@ const ChallanDepositScreen: React.FC<ChallanDepositScreenProps> = ({ navigation,
           routes: [{ name: 'StudentHome' }],
         })
       );
-    } catch (error) {
-      console.error('Error submitting deposit:', error);
+    } catch {
       Alert.alert('Error', 'Failed to submit deposit proof. Please try again.');
     } finally {
       setSubmitting(false);

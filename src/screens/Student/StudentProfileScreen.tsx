@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Alert, Image, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert, TouchableOpacity, Image } from 'react-native';
 import { Text, Button, Card } from 'react-native-paper';
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import { db } from '@config/firebase';
@@ -10,8 +10,7 @@ import { COLORS, SPACING, FONTS } from '@constants/theme';
 import { formatDistanceToNow } from 'date-fns';
 import { StackScreenProps } from '@react-navigation/stack';
 import { StudentProfileStackParamList } from '@navigation/types';
-
-type StudentProfileScreenProps = StackScreenProps<StudentProfileStackParamList, 'StudentProfile'>;
+import { formatPKR } from '@utils/formatters';
 
 const getInitials = (name: string): string => {
   const parts = name.trim().split(' ');
@@ -19,6 +18,8 @@ const getInitials = (name: string): string => {
   const last = parts[parts.length - 1]?.[0] || '';
   return (first + last).toUpperCase();
 };
+
+type StudentProfileScreenProps = StackScreenProps<StudentProfileStackParamList, 'StudentProfile'>;
 
 export const StudentProfileScreen: React.FC<StudentProfileScreenProps> = ({ navigation }) => {
   const { currentUser, logout } = useAuth();
@@ -38,8 +39,8 @@ export const StudentProfileScreen: React.FC<StudentProfileScreenProps> = ({ navi
         setTotalRides(snap.size);
         const spent = snap.docs.reduce((sum, d) => sum + (d.data().fareAmount || 0), 0);
         setTotalSpent(spent);
-      } catch (error) {
-        console.error('Error fetching stats:', error);
+      } catch {
+        // silently handle stats error
       }
     };
     fetchStats();
@@ -61,14 +62,14 @@ export const StudentProfileScreen: React.FC<StudentProfileScreenProps> = ({ navi
       )
     : 'N/A';
 
-  const avatarSource = currentUser?.profileImageUrl;
+
 
   return (
     <ScrollView style={styles.container}>
       {/* Profile Header */}
       <View style={styles.header}>
-        {avatarSource ? (
-          <Image source={{ uri: avatarSource }} style={styles.avatar} />
+        {currentUser?.profileImageUrl ? (
+          <Image source={{ uri: currentUser.profileImageUrl }} style={styles.avatar} />
         ) : (
           <View style={styles.avatarFallback}>
             <Text style={styles.avatarInitials}>{getInitials(currentUser?.fullName || '')}</Text>
@@ -87,7 +88,7 @@ export const StudentProfileScreen: React.FC<StudentProfileScreenProps> = ({ navi
           <Text style={styles.statLabel}>Total Rides</Text>
         </View>
         <View style={[styles.statBox, { borderLeftWidth: 1, borderLeftColor: '#E0E0E0' }]}>
-          <Text style={styles.statValue}>PKR {totalSpent.toLocaleString()}</Text>
+          <Text style={styles.statValue}>{formatPKR(totalSpent)}</Text>
           <Text style={styles.statLabel}>Total Spent</Text>
         </View>
       </View>

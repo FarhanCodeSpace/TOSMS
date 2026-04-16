@@ -97,7 +97,6 @@ export const ActiveRideScreen: React.FC<any> = ({ route, navigation }) => {
               },
               (error: any) => {
                 if (error.code === 'permission-denied') return;
-                console.error("Student availability listener error:", error);
               }
             );
             availUnsubscribers.push(unsub);
@@ -109,7 +108,6 @@ export const ActiveRideScreen: React.FC<any> = ({ route, navigation }) => {
 
         // 5. Request Location Permissions
         const { status } = await Location.requestForegroundPermissionsAsync();
-        console.log('Location permission status:', status);
         if (status !== 'granted') {
           Alert.alert('Permission Denied', 'Location permission is required to track the ride. Please enable it in your phone settings.');
           navigation.goBack();
@@ -125,7 +123,6 @@ export const ActiveRideScreen: React.FC<any> = ({ route, navigation }) => {
           },
           async (location) => {
             const coords = location.coords;
-            console.log('New location received:', coords.latitude, coords.longitude);
             if (isMounted) setDriverLocation(coords);
 
             if (currentUser?.uid && rideId) {
@@ -139,17 +136,14 @@ export const ActiveRideScreen: React.FC<any> = ({ route, navigation }) => {
                   speed: coords.speed,
                   updatedAt: serverTimestamp()
                 }, { merge: true });
-                console.log('Location written to Firestore successfully');
-                console.log('setDoc success');
-              } catch (error) {
-                console.error('setDoc failed:', error);
+              } catch {
+                // silently handle location write error
               }
             }
           }
         );
-        console.log('Location watcher started successfully');
-      } catch (error) {
-        console.error('Error initializing ride:', error);
+      } catch {
+        // silently handle initialization error
       }
     };
 
@@ -211,8 +205,7 @@ export const ActiveRideScreen: React.FC<any> = ({ route, navigation }) => {
 
               // 4. Navigate to summary
               navigation.replace('RideSummary', { rideId });
-            } catch (error) {
-              console.error('Error ending ride:', error);
+            } catch {
               Alert.alert('Error', 'Failed to end ride. Please check network connection.');
             }
           }

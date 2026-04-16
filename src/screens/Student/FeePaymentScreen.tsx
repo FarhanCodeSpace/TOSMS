@@ -22,6 +22,8 @@ import { format } from 'date-fns';
 import * as Clipboard from 'expo-clipboard';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { StudentHomeStackParamList } from '@navigation/types';
+import LoadingSpinner from '@components/common/LoadingSpinner';
+import { formatPKR } from '@utils/formatters';
 
 type FeePaymentScreenProps = {
   navigation: StackNavigationProp<StudentHomeStackParamList, 'FeePayment'>;
@@ -70,7 +72,6 @@ const FeePaymentScreen: React.FC<FeePaymentScreenProps> = ({ navigation }) => {
         }
       }, (error: any) => {
         if (error.code === 'permission-denied') return;
-        console.error('Fee status listener error:', error);
       });
 
       // 2. Fetch Route Fee Amount (One-time)
@@ -83,8 +84,7 @@ const FeePaymentScreen: React.FC<FeePaymentScreenProps> = ({ navigation }) => {
       }
 
       return () => unsubscribeFee();
-    } catch (error) {
-      console.error('Error fetching fee data:', error);
+    } catch {
       Alert.alert('Error', 'Failed to load fee information.');
     } finally {
       setLoading(false);
@@ -119,8 +119,7 @@ const FeePaymentScreen: React.FC<FeePaymentScreenProps> = ({ navigation }) => {
       setSubmitting(false);
       
       navigation.navigate('ChallanView', { challanId: newChallanRef.id });
-    } catch (error) {
-      console.error('Error generating challan:', error);
+    } catch {
       Alert.alert('Error', 'Failed to generate challan slip.');
       setSubmitting(false);
     }
@@ -151,8 +150,7 @@ const FeePaymentScreen: React.FC<FeePaymentScreenProps> = ({ navigation }) => {
       
       Alert.alert('Submitted!', 'Admin will verify within 24 hours.');
       navigation.navigate('StudentHome');
-    } catch (error) {
-      console.error('Error submitting payment proof:', error);
+    } catch {
       Alert.alert('Error', 'Failed to submit payment details.');
     } finally {
       setSubmitting(false);
@@ -165,11 +163,7 @@ const FeePaymentScreen: React.FC<FeePaymentScreenProps> = ({ navigation }) => {
   };
 
   if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-      </View>
-    );
+    return <LoadingSpinner />;
   }
 
   // Success State
@@ -244,7 +238,7 @@ const FeePaymentScreen: React.FC<FeePaymentScreenProps> = ({ navigation }) => {
           </View>
           <View style={styles.summaryRow}>
             <Icon name="cash" size={20} color={COLORS.primary} />
-            <Text style={[styles.summaryText, { color: COLORS.primary, fontWeight: '700' }]}>PKR {feeAmount}</Text>
+            <Text style={[styles.summaryText, { color: COLORS.primary, fontWeight: '700' }]}>{formatPKR(feeAmount)}</Text>
           </View>
           <View style={styles.summaryRow}>
             <Icon name="calendar-alert" size={20} color="#DC2626" />
@@ -308,7 +302,7 @@ const FeePaymentScreen: React.FC<FeePaymentScreenProps> = ({ navigation }) => {
                   <Icon name="content-copy" size={20} color={COLORS.primary} />
                 </TouchableOpacity>
               </View>
-              <Text style={styles.amountToSend}>Amount to send: PKR {feeAmount}</Text>
+              <Text style={styles.amountToSend}>Amount to send: {formatPKR(feeAmount)}</Text>
               
               <TextInput
                 label="Transaction ID (from SMS)"

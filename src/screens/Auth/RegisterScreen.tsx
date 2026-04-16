@@ -6,6 +6,7 @@ import { COLORS, SPACING } from "@constants/theme";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { AuthStackParamList } from "@navigation/types";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { handleFirebaseError } from "@utils/errorHandler";
 
 
 type RegisterScreenProps = {
@@ -62,20 +63,7 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
         email: email
       });
     } catch (err: any) {
-      console.error("Registration error:", err.code);
-      switch (err.code) {
-        case "auth/email-already-in-use":
-          setError("Email already in use. Please try another.");
-          break;
-        case "auth/invalid-email":
-          setError("Invalid email address format");
-          break;
-        case "auth/weak-password":
-          setError("Password is too weak");
-          break;
-        default:
-          setError("An unexpected error occurred. Please try again.");
-      }
+      setError(handleFirebaseError(err.code));
     } finally {
       setIsLoading(false);
     }

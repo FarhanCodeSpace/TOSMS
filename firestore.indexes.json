@@ -1,0 +1,80 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "availability",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "userId", "order": "ASCENDING"},
+        {"fieldPath": "date", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "availability",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "routeId", "order": "ASCENDING"},
+        {"fieldPath": "date", "order": "ASCENDING"},
+        {"fieldPath": "role", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "availability",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "routeId", "order": "ASCENDING"},
+        {"fieldPath": "date", "order": "ASCENDING"},
+        {"fieldPath": "isAvailable", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "feePayments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "studentId", "order": "ASCENDING"},
+        {"fieldPath": "month", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "feePayments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "month", "order": "ASCENDING"},
+        {"fieldPath": "paymentStatus", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "rides",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "routeId", "order": "ASCENDING"},
+        {"fieldPath": "status", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "rides",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "routeId", "order": "ASCENDING"},
+        {"fieldPath": "date", "order": "ASCENDING"},
+        {"fieldPath": "status", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "routes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "assignedDriverId", "order": "ASCENDING"},
+        {"fieldPath": "isActive", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "reviews",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "driverId", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "DESCENDING"}
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

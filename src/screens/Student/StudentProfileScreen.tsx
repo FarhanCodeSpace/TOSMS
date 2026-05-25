@@ -1,78 +1,101 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Alert, TouchableOpacity, Image } from 'react-native';
-import { Text, Button, Card } from 'react-native-paper';
-import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
-import { db } from '@config/firebase';
-import { COLLECTIONS } from '@config/firebaseCollections';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { useAuth } from '@hooks/useAuth';
-import { COLORS, SPACING, FONTS } from '@constants/theme';
-import { formatDistanceToNow } from 'date-fns';
-import { StackScreenProps } from '@react-navigation/stack';
-import { StudentProfileStackParamList } from '@navigation/types';
-import { formatPKR } from '@utils/formatters';
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  Alert,
+  TouchableOpacity,
+  Image,
+} from "react-native";
+import { Text, Button, Card } from "react-native-paper";
+import { MaterialCommunityIcons as Icon } from "@expo/vector-icons";
+import { db } from "@config/firebase";
+import { COLLECTIONS } from "@config/firebaseCollections";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { useAuth } from "@hooks/useAuth";
+import { COLORS, SPACING, FONTS } from "@constants/theme";
+import { formatDistanceToNow } from "date-fns";
+import { StackScreenProps } from "@react-navigation/stack";
+import { StudentProfileStackParamList } from "@navigation/types";
+import { formatPKR } from "@utils/formatters";
 
 const getInitials = (name: string): string => {
-  const parts = name.trim().split(' ');
-  const first = parts[0]?.[0] || '';
-  const last = parts[parts.length - 1]?.[0] || '';
+  const parts = name.trim().split(" ");
+  const first = parts[0]?.[0] || "";
+  const last = parts[parts.length - 1]?.[0] || "";
   return (first + last).toUpperCase();
 };
 
-type StudentProfileScreenProps = StackScreenProps<StudentProfileStackParamList, 'StudentProfile'>;
+type StudentProfileScreenProps = StackScreenProps<
+  StudentProfileStackParamList,
+  "StudentProfile"
+>;
 
-export const StudentProfileScreen: React.FC<StudentProfileScreenProps> = ({ navigation }) => {
+export const StudentProfileScreen: React.FC<StudentProfileScreenProps> = ({
+  navigation,
+}) => {
   const { currentUser, logout } = useAuth();
   const [totalRides, setTotalRides] = useState(0);
   const [totalSpent, setTotalSpent] = useState(0);
 
   useEffect(() => {
-    const fetchStats = async () => {
-      if (!currentUser?.uid) return;
-      try {
-        const q = query(
-          collection(db, COLLECTIONS.BOOKINGS),
-          where('studentId', '==', currentUser.uid),
-          where('status', '==', 'completed')
-        );
-        const snap = await getDocs(q);
+    if (!currentUser?.uid) return;
+
+    const q = query(
+      collection(db, COLLECTIONS.BOOKINGS),
+      where("studentId", "==", currentUser.uid),
+      where("status", "==", "completed"),
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snap) => {
         setTotalRides(snap.size);
-        const spent = snap.docs.reduce((sum, d) => sum + (d.data().fareAmount || 0), 0);
+        const spent = snap.docs.reduce(
+          (sum, d) => sum + (d.data().fareAmount || 0),
+          0,
+        );
         setTotalSpent(spent);
-      } catch {
+      },
+      () => {
         // silently handle stats error
-      }
-    };
-    fetchStats();
+      },
+    );
+
+    return () => unsubscribe();
   }, [currentUser?.uid]);
 
   const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Logout', style: 'destructive', onPress: logout },
+    Alert.alert("Logout", "Are you sure you want to logout?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Logout", style: "destructive", onPress: logout },
     ]);
   };
 
   const memberSince = currentUser?.createdAt
     ? formatDistanceToNow(
-        typeof currentUser.createdAt === 'object' && 'toDate' in currentUser.createdAt
+        typeof currentUser.createdAt === "object" &&
+          "toDate" in currentUser.createdAt
           ? (currentUser.createdAt as any).toDate()
           : new Date(currentUser.createdAt),
-        { addSuffix: true }
+        { addSuffix: true },
       )
-    : 'N/A';
-
-
+    : "N/A";
 
   return (
     <ScrollView style={styles.container}>
       {/* Profile Header */}
       <View style={styles.header}>
         {currentUser?.profileImageUrl ? (
-          <Image source={{ uri: currentUser.profileImageUrl }} style={styles.avatar} />
+          <Image
+            source={{ uri: currentUser.profileImageUrl }}
+            style={styles.avatar}
+          />
         ) : (
           <View style={styles.avatarFallback}>
-            <Text style={styles.avatarInitials}>{getInitials(currentUser?.fullName || '')}</Text>
+            <Text style={styles.avatarInitials}>
+              {getInitials(currentUser?.fullName || "")}
+            </Text>
           </View>
         )}
         <Text style={styles.fullName}>{currentUser?.fullName}</Text>
@@ -87,7 +110,12 @@ export const StudentProfileScreen: React.FC<StudentProfileScreenProps> = ({ navi
           <Text style={styles.statValue}>{totalRides}</Text>
           <Text style={styles.statLabel}>Total Rides</Text>
         </View>
-        <View style={[styles.statBox, { borderLeftWidth: 1, borderLeftColor: '#E0E0E0' }]}>
+        <View
+          style={[
+            styles.statBox,
+            { borderLeftWidth: 1, borderLeftColor: "#E0E0E0" },
+          ]}
+        >
           <Text style={styles.statValue}>{formatPKR(totalSpent)}</Text>
           <Text style={styles.statLabel}>Total Spent</Text>
         </View>
@@ -95,9 +123,9 @@ export const StudentProfileScreen: React.FC<StudentProfileScreenProps> = ({ navi
 
       {/* Menu Options */}
       <View style={styles.menuSection}>
-        <TouchableOpacity 
-          style={styles.menuItem} 
-          onPress={() => navigation.navigate('PaymentHistory')}
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => navigation.navigate("PaymentHistory")}
         >
           <View style={styles.menuItemLeft}>
             <View style={styles.menuIconBox}>
@@ -115,7 +143,7 @@ export const StudentProfileScreen: React.FC<StudentProfileScreenProps> = ({ navi
           mode="contained"
           buttonColor={COLORS.primary}
           style={styles.actionBtn}
-          onPress={() => navigation.navigate('EditProfile')}
+          onPress={() => navigation.navigate("EditProfile")}
         >
           Edit Profile
         </Button>
@@ -135,46 +163,88 @@ export const StudentProfileScreen: React.FC<StudentProfileScreenProps> = ({ navi
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   header: {
-    alignItems: 'center',
+    alignItems: "center",
     backgroundColor: COLORS.primary,
     paddingTop: 60,
     paddingBottom: SPACING.xl,
     paddingHorizontal: SPACING.md,
   },
-  avatar: { width: 96, height: 96, borderRadius: 48, borderWidth: 3, borderColor: 'white', marginBottom: SPACING.md },
+  avatar: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    borderWidth: 3,
+    borderColor: "white",
+    marginBottom: SPACING.md,
+  },
   avatarFallback: {
     width: 96,
     height: 96,
     borderRadius: 48,
     backgroundColor: COLORS.accent,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: SPACING.md,
     borderWidth: 3,
-    borderColor: 'white',
+    borderColor: "white",
   },
-  avatarInitials: { color: 'white', fontSize: 32, fontWeight: 'bold' },
-  fullName: { fontSize: FONTS.xxl, fontWeight: 'bold', color: 'white', marginBottom: 4 },
-  email: { color: 'rgba(255,255,255,0.75)', fontSize: FONTS.md, marginBottom: 2 },
-  phone: { color: 'rgba(255,255,255,0.75)', fontSize: FONTS.md, marginBottom: 2 },
-  memberSince: { color: 'rgba(255,255,255,0.6)', fontSize: FONTS.sm, marginTop: 4 },
+  avatarInitials: { color: "white", fontSize: 32, fontWeight: "bold" },
+  fullName: {
+    fontSize: FONTS.xxl,
+    fontWeight: "bold",
+    color: "white",
+    marginBottom: 4,
+  },
+  email: {
+    color: "rgba(255,255,255,0.75)",
+    fontSize: FONTS.md,
+    marginBottom: 2,
+  },
+  phone: {
+    color: "rgba(255,255,255,0.75)",
+    fontSize: FONTS.md,
+    marginBottom: 2,
+  },
+  memberSince: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: FONTS.sm,
+    marginTop: 4,
+  },
   statsRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     backgroundColor: COLORS.surface,
     marginHorizontal: SPACING.md,
     marginTop: SPACING.md,
     borderRadius: 12,
     elevation: 2,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
-  statBox: { flex: 1, padding: SPACING.md, alignItems: 'center' },
-  statValue: { fontSize: FONTS.xxl, fontWeight: 'bold', color: COLORS.primary },
+  statBox: { flex: 1, padding: SPACING.md, alignItems: "center" },
+  statValue: { fontSize: FONTS.xxl, fontWeight: "bold", color: COLORS.primary },
   statLabel: { color: COLORS.textSecondary, fontSize: FONTS.sm, marginTop: 4 },
-  menuSection: { marginTop: SPACING.lg, marginHorizontal: SPACING.md, backgroundColor: COLORS.surface, borderRadius: 12, elevation: 1 },
-  menuItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: SPACING.md },
-  menuItemLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  menuIconBox: { width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.background, alignItems: 'center', justifyContent: 'center' },
-  menuItemText: { fontSize: FONTS.md, fontWeight: '600', color: COLORS.text },
+  menuSection: {
+    marginTop: SPACING.lg,
+    marginHorizontal: SPACING.md,
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    elevation: 1,
+  },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: SPACING.md,
+  },
+  menuItemLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+  menuIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.background,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  menuItemText: { fontSize: FONTS.md, fontWeight: "600", color: COLORS.text },
   actions: { padding: SPACING.md, gap: SPACING.md, marginTop: SPACING.sm },
   actionBtn: { borderRadius: 8 },
 });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -11,34 +11,42 @@ import {
   Keyboard,
   Pressable,
   KeyboardAvoidingView,
-} from 'react-native';
-import { Text, Button, TextInput } from 'react-native-paper';
-import * as ImagePicker from 'expo-image-picker';
-import { db } from '@config/firebase';
-import { COLLECTIONS } from '@config/firebaseCollections';
-import { doc, updateDoc } from 'firebase/firestore';
-import { uploadFileToStorage } from '@utils/imageUtils';
-import { useAuth } from '@hooks/useAuth';
-import { COLORS, SPACING, FONTS } from '@constants/theme';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { StackScreenProps } from '@react-navigation/stack';
-import { StudentProfileStackParamList } from '@navigation/types';
-import AvatarComponent from '@components/common/Avatar';
+} from "react-native";
+import { Text, TextInput } from "react-native-paper";
+import * as ImagePicker from "expo-image-picker";
+import { db } from "@config/firebase";
+import { COLLECTIONS } from "@config/firebaseCollections";
+import { doc, updateDoc } from "firebase/firestore";
+import { uploadFileToStorage } from "@utils/imageUtils";
+import { useAuth } from "@hooks/useAuth";
+import { COLORS, SPACING, FONTS } from "@constants/theme";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { StackScreenProps } from "@react-navigation/stack";
+import { StudentProfileStackParamList } from "@navigation/types";
+import AvatarComponent from "@components/common/Avatar";
 
-type EditProfileScreenProps = StackScreenProps<StudentProfileStackParamList, 'EditProfile'>;
+type EditProfileScreenProps = StackScreenProps<
+  StudentProfileStackParamList,
+  "EditProfile"
+>;
 
-export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation }) => {
+export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({
+  navigation,
+}) => {
   const { currentUser, updateUser } = useAuth();
 
-  const [fullName, setFullName] = useState(currentUser?.fullName || '');
-  const [phone, setPhone] = useState(currentUser?.phone || '');
+  const [fullName, setFullName] = useState(currentUser?.fullName || "");
+  const [phone, setPhone] = useState(currentUser?.phone || "");
   const [newImageUri, setNewImageUri] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission Denied', 'Allow access to your photos to update your profile picture.');
+    if (status !== "granted") {
+      Alert.alert(
+        "Permission Denied",
+        "Allow access to your photos to update your profile picture.",
+      );
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -54,6 +62,8 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation
 
   const handleSave = async () => {
     if (!currentUser?.uid) return;
+    if (isSaving) return;
+
     setIsSaving(true);
     try {
       let profileImageUrl = currentUser.profileImageUrl;
@@ -66,10 +76,10 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation
       const updatedData = { fullName, phone, profileImageUrl };
       await updateDoc(doc(db, COLLECTIONS.USERS, currentUser.uid), updatedData);
       updateUser(updatedData);
-      Alert.alert('Success', 'Profile updated successfully!');
+      Alert.alert("Success", "Profile updated successfully!");
       navigation.goBack();
     } catch {
-      Alert.alert('Error', 'Failed to update profile. Please try again.');
+      Alert.alert("Error", "Failed to update profile. Please try again.");
     } finally {
       setIsSaving(false);
     }
@@ -78,13 +88,13 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation
   const avatarSource = newImageUri || currentUser?.profileImageUrl;
 
   return (
-    <Pressable 
-      style={styles.container} 
+    <Pressable
+      style={styles.container}
       onPress={Keyboard.dismiss}
       accessible={false}
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >
         <ScrollView
@@ -92,71 +102,77 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-        {/* ── Floating Back Button ── */}
-        <TouchableOpacity 
-          style={styles.backButton} 
-          onPress={() => navigation.goBack()}
-        >
-          <MaterialCommunityIcons name="chevron-left" size={28} color={COLORS.text} />
-        </TouchableOpacity>
-
-        {/* Avatar Picker */}
-        <View style={styles.avatarSection}>
-          <TouchableOpacity onPress={handlePickImage}>
-            <AvatarComponent
-              imageUrl={avatarSource || undefined}
-              name={currentUser?.fullName || ''}
-              size={100}
-              onPress={handlePickImage}
+          {/* ── Floating Back Button ── */}
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <MaterialCommunityIcons
+              name="chevron-left"
+              size={28}
+              color={COLORS.text}
             />
-            <View style={styles.editBadge}>
-              <MaterialCommunityIcons name="camera" size={14} color="white" />
-            </View>
           </TouchableOpacity>
-          <Text style={styles.changePhotoText}>Tap to change photo</Text>
-        </View>
 
-        {/* Form Fields */}
-        <TextInput
-          label="Full Name"
-          value={fullName}
-          onChangeText={setFullName}
-          mode="outlined"
-          style={styles.input}
-          outlineColor={COLORS.primary}
-          activeOutlineColor={COLORS.primary}
-        />
+          {/* Avatar Picker */}
+          <View style={styles.avatarSection}>
+            <TouchableOpacity onPress={handlePickImage}>
+              <AvatarComponent
+                imageUrl={avatarSource || undefined}
+                name={currentUser?.fullName || ""}
+                size={100}
+                onPress={handlePickImage}
+              />
+              <View style={styles.editBadge}>
+                <MaterialCommunityIcons name="camera" size={14} color="white" />
+              </View>
+            </TouchableOpacity>
+            <Text style={styles.changePhotoText}>Tap to change photo</Text>
+          </View>
 
-        <TextInput
-          label="Phone Number"
-          value={phone}
-          onChangeText={setPhone}
-          mode="outlined"
-          style={styles.input}
-          keyboardType="phone-pad"
-          outlineColor={COLORS.primary}
-          activeOutlineColor={COLORS.primary}
-        />
+          {/* Form Fields */}
+          <TextInput
+            label="Full Name"
+            value={fullName}
+            onChangeText={setFullName}
+            mode="outlined"
+            style={styles.input}
+            outlineColor={COLORS.primary}
+            activeOutlineColor={COLORS.primary}
+          />
 
-        <TextInput
-          label="Email"
-          value={currentUser?.email || ''}
-          mode="outlined"
-          style={styles.input}
-          disabled
-          outlineColor={COLORS.primary}
-        />
+          <TextInput
+            label="Phone Number"
+            value={phone}
+            onChangeText={setPhone}
+            mode="outlined"
+            style={styles.input}
+            keyboardType="phone-pad"
+            outlineColor={COLORS.primary}
+            activeOutlineColor={COLORS.primary}
+          />
 
-        <Button
-          mode="contained"
-          buttonColor={COLORS.primary}
-          style={styles.saveBtn}
-          loading={isSaving}
-          disabled={isSaving}
-          onPress={handleSave}
-        >
-          Save Changes
-        </Button>
+          <TextInput
+            label="Email"
+            value={currentUser?.email || ""}
+            mode="outlined"
+            style={styles.input}
+            disabled
+            outlineColor={COLORS.primary}
+          />
+
+          <TouchableOpacity
+            style={[styles.saveBtn, isSaving && styles.saveBtnDisabled]}
+            onPress={handleSave}
+            disabled={isSaving}
+            activeOpacity={0.85}
+          >
+            {isSaving ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.saveBtnText}>Save Changes</Text>
+            )}
+          </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
     </Pressable>
@@ -170,42 +186,59 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "white",
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 20,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
-  avatarSection: { alignItems: 'center', marginBottom: SPACING.xl, marginTop: SPACING.xs },
+  avatarSection: {
+    alignItems: "center",
+    marginBottom: SPACING.xl,
+    marginTop: SPACING.xs,
+  },
   avatar: { width: 100, height: 100, borderRadius: 50 },
   avatarFallback: {
     width: 100,
     height: 100,
     borderRadius: 50,
     backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
-  avatarInitials: { color: 'white', fontSize: 32, fontWeight: 'bold' },
+  avatarInitials: { color: "white", fontSize: 32, fontWeight: "bold" },
   editBadge: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     right: 0,
     backgroundColor: COLORS.accent,
     borderRadius: 14,
     width: 28,
     height: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   editBadgeText: { fontSize: 14 },
-  changePhotoText: { color: COLORS.textSecondary, fontSize: FONTS.sm, marginTop: SPACING.sm },
+  changePhotoText: {
+    color: COLORS.textSecondary,
+    fontSize: FONTS.sm,
+    marginTop: SPACING.sm,
+  },
   input: { marginBottom: SPACING.md, backgroundColor: COLORS.surface },
-  saveBtn: { borderRadius: 8, marginTop: SPACING.sm },
+  saveBtn: {
+    minHeight: 48,
+    borderRadius: 8,
+    marginTop: SPACING.sm,
+    backgroundColor: COLORS.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  saveBtnDisabled: { opacity: 0.7 },
+  saveBtnText: { color: "white", fontWeight: "700" },
 });
 
 export default EditProfileScreen;

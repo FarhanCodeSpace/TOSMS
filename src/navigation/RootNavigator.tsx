@@ -4,6 +4,7 @@ import { useAuth } from "@hooks/useAuth";
 import { AuthNavigator } from "./AuthNavigator";
 import { StudentNavigator } from "./StudentNavigator";
 import { DriverNavigator } from "./DriverNavigator";
+import { DriverProfileSetupScreen } from "@screens/Auth";
 import { DriverPendingScreen } from "@screens/Shared";
 import { COLORS } from "@constants/theme";
 import {
@@ -63,15 +64,15 @@ export const RootNavigator = () => {
 
     if (currentUser.role === "driver") {
       if (!currentUser.profileComplete) {
-        return (
-          <AuthNavigator key="driver-setup" initialRoute="DriverProfileSetup" />
-        );
+        return <DriverProfileSetupScreen key="driver-setup" />;
       }
-      return currentUser.approved ? (
-        <DriverNavigator key="driver-approved" />
-      ) : (
-        <DriverPendingScreen key="driver-pending" />
-      );
+      if (!currentUser.approved || currentUser.approved === false) {
+        return <DriverPendingScreen key="driver-pending" />;
+      }
+      if (currentUser.approved === true && currentUser.status === "active") {
+        return <DriverNavigator key="driver-approved" />;
+      }
+      return <DriverPendingScreen key="driver-fallback-pending" />;
     }
 
     return <StudentNavigator key="student" />;

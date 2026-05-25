@@ -3,7 +3,6 @@ import {
   View,
   StyleSheet,
   ScrollView,
-  RefreshControl,
   TouchableOpacity,
   ActivityIndicator,
   Animated,
@@ -39,7 +38,6 @@ const StudentHomeScreen: React.FC<{
   navigation: StackNavigationProp<StudentHomeStackParamList, "StudentHome">;
 }> = ({ navigation }) => {
   const { currentUser } = useAuth();
-  const [refreshing, setRefreshing] = useState(false);
   const [myRoute, setMyRoute] = useState<any>(null);
   const [todayRide, setTodayRide] = useState<any>(null);
   const [feeStatus, setFeeStatus] = useState<
@@ -191,7 +189,7 @@ const StudentHomeScreen: React.FC<{
         unsubscribeAvail();
         unsubscribeWeek();
       };
-    }, [currentUser?.uid, currentUser.routeId, tomorrowStr])
+    }, [currentUser?.uid, currentUser.routeId, tomorrowStr]),
   );
 
   useEffect(() => {
@@ -232,11 +230,6 @@ const StudentHomeScreen: React.FC<{
     outputRange: ["0deg", "360deg"],
   });
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  };
-
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return "Good Morning";
@@ -261,12 +254,7 @@ const StudentHomeScreen: React.FC<{
           <ActivityIndicator color={COLORS.primary} />
         </View>
       ) : (
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-        >
+        <ScrollView showsVerticalScrollIndicator={false}>
           {/* ── Header ── */}
           <View style={styles.header}>
             <View style={styles.headerTop}>
@@ -730,7 +718,11 @@ const StudentHomeScreen: React.FC<{
                     <View
                       style={[
                         styles.rideStatusPill,
-                        { backgroundColor: "#F3F4F6", borderWidth: 1, borderColor: "#E5E7EB" },
+                        {
+                          backgroundColor: "#F3F4F6",
+                          borderWidth: 1,
+                          borderColor: "#E5E7EB",
+                        },
                       ]}
                     >
                       <Text
@@ -747,7 +739,12 @@ const StudentHomeScreen: React.FC<{
                         size={14}
                         color="#16A34A"
                       />
-                      <Text style={[styles.rideInfoText, { color: "#16A34A", fontWeight: "600" }]}>
+                      <Text
+                        style={[
+                          styles.rideInfoText,
+                          { color: "#16A34A", fontWeight: "600" },
+                        ]}
+                      >
                         Ride completed
                       </Text>
                     </View>
@@ -765,7 +762,10 @@ const StudentHomeScreen: React.FC<{
                     </View>
                   </View>
                   <TouchableOpacity
-                    style={[styles.rideActionBtn, { backgroundColor: "#9CA3AF", marginTop: 16 }]}
+                    style={[
+                      styles.rideActionBtn,
+                      { backgroundColor: "#9CA3AF", marginTop: 16 },
+                    ]}
                     disabled={true}
                   >
                     <MaterialCommunityIcons
@@ -773,7 +773,9 @@ const StudentHomeScreen: React.FC<{
                       size={16}
                       color="white"
                     />
-                    <Text style={styles.rideActionBtnText}>Arrived at Destination</Text>
+                    <Text style={styles.rideActionBtnText}>
+                      Arrived at Destination
+                    </Text>
                   </TouchableOpacity>
                 </View>
               ) : null}

@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { View, StyleSheet, TouchableOpacity, Platform, KeyboardAvoidingView, ScrollView } from "react-native";
 import {
-  TextInput,
-  Button,
-  Text,
-  HelperText,
-  Snackbar,
-} from "react-native-paper";
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  Platform,
+  KeyboardAvoidingView,
+  ScrollView,
+  ActivityIndicator,
+} from "react-native";
+import { TextInput, Text, HelperText, Snackbar } from "react-native-paper";
 import { useAuth } from "@hooks/useAuth";
 import { COLORS, SPACING } from "@constants/theme";
 import { StackNavigationProp } from "@react-navigation/stack";
@@ -25,7 +27,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation, route }) => {
   const [email, setEmail] = useState(route.params?.email || "");
   const [password, setPassword] = useState("");
   const [secureText, setSecureText] = useState(true);
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successVisible, setSuccessVisible] = useState(false);
 
@@ -37,30 +39,29 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation, route }) => {
   }, [route.params?.successMessage]);
 
   const handleLogin = async () => {
+    if (loading) return;
+
     if (!email || !password) {
       setError("Please enter both email and password");
       return;
     }
 
-    setIsLoading(true);
+    setLoading(true);
     setError(null);
 
     try {
       await login(email, password);
-      // Wait a bit to let the navigation happen through the RootNavigator
-      setTimeout(() => {
-        setIsLoading(false);
-      }, 5000);
     } catch (err: any) {
-      setIsLoading(false);
       setError(handleFirebaseError(err.code));
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <View style={styles.root}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >
         <ScrollView
@@ -68,85 +69,117 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation, route }) => {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-        <View style={styles.header}>
-          <View style={styles.logoContainer}>
-            <MaterialCommunityIcons name="bus-clock" size={40} color="white" />
-          </View>
-          <Text style={styles.logoText}>TOSMS</Text>
-          <Text style={styles.subtitle}>
-            Transport Management
-          </Text>
-        </View>
-
-        <View style={styles.form}>
-          <TextInput
-            label="Email"
-            value={email}
-            onChangeText={setEmail}
-            mode="outlined"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            outlineColor={COLORS.primary}
-            activeOutlineColor={COLORS.primary}
-            style={styles.input}
-            disabled={isLoading}
-            left={<TextInput.Icon icon={() => <MaterialCommunityIcons name="email-outline" size={24} color={COLORS.textSecondary} />} />}
-          />
-
-          <TextInput
-            label="Password"
-            value={password}
-            onChangeText={setPassword}
-            mode="outlined"
-            secureTextEntry={secureText}
-            outlineColor={COLORS.primary}
-            activeOutlineColor={COLORS.primary}
-            style={styles.input}
-            disabled={isLoading}
-            left={<TextInput.Icon icon={() => <MaterialCommunityIcons name="lock-outline" size={24} color={COLORS.textSecondary} />} />}
-            right={
-              <TextInput.Icon
-                icon={() => <MaterialCommunityIcons name={secureText ? "eye-outline" : "eye-off-outline"} size={24} color={COLORS.textSecondary} />}
-                onPress={() => setSecureText(!secureText)}
+          <View style={styles.header}>
+            <View style={styles.logoContainer}>
+              <MaterialCommunityIcons
+                name="bus-clock"
+                size={40}
+                color="white"
               />
-            }
-          />
-
-          {error && (
-            <HelperText type="error" visible={!!error} style={styles.errorText}>
-              {error}
-            </HelperText>
-          )}
-
-          <TouchableOpacity
-            onPress={() => navigation.navigate("ForgotPassword")}
-            style={styles.forgotPassword}
-          >
-            <Text style={styles.linkText}>Forgot Password?</Text>
-          </TouchableOpacity>
-
-          <Button
-            mode="contained"
-            onPress={handleLogin}
-            loading={isLoading}
-            disabled={isLoading}
-            style={styles.button}
-            contentStyle={styles.buttonContent}
-            buttonColor={COLORS.primary}
-            textColor={COLORS.onPrimary}
-          >
-            Login
-          </Button>
-
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Don't have an account? </Text>
-            <TouchableOpacity onPress={() => navigation.navigate("Register")}>
-              <Text style={[styles.linkText, { fontWeight: "bold" }]}>
-                Register
-              </Text>
-            </TouchableOpacity>
+            </View>
+            <Text style={styles.logoText}>TOSMS</Text>
+            <Text style={styles.subtitle}>Transport Management</Text>
           </View>
-        </View>
+
+          <View style={styles.form}>
+            <TextInput
+              label="Email"
+              value={email}
+              onChangeText={setEmail}
+              mode="outlined"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              outlineColor={COLORS.primary}
+              activeOutlineColor={COLORS.primary}
+              style={styles.input}
+              disabled={loading}
+              left={
+                <TextInput.Icon
+                  icon={() => (
+                    <MaterialCommunityIcons
+                      name="email-outline"
+                      size={24}
+                      color={COLORS.textSecondary}
+                    />
+                  )}
+                />
+              }
+            />
+
+            <TextInput
+              label="Password"
+              value={password}
+              onChangeText={setPassword}
+              mode="outlined"
+              secureTextEntry={secureText}
+              outlineColor={COLORS.primary}
+              activeOutlineColor={COLORS.primary}
+              style={styles.input}
+              disabled={loading}
+              left={
+                <TextInput.Icon
+                  icon={() => (
+                    <MaterialCommunityIcons
+                      name="lock-outline"
+                      size={24}
+                      color={COLORS.textSecondary}
+                    />
+                  )}
+                />
+              }
+              right={
+                <TextInput.Icon
+                  icon={() => (
+                    <MaterialCommunityIcons
+                      name={secureText ? "eye-outline" : "eye-off-outline"}
+                      size={24}
+                      color={COLORS.textSecondary}
+                    />
+                  )}
+                  onPress={() => setSecureText(!secureText)}
+                />
+              }
+            />
+
+            {error && (
+              <HelperText
+                type="error"
+                visible={!!error}
+                style={styles.errorText}
+              >
+                {error}
+              </HelperText>
+            )}
+
+            <TouchableOpacity
+              onPress={() => navigation.navigate("ForgotPassword")}
+              style={styles.forgotPassword}
+            >
+              <Text style={styles.linkText}>Forgot Password?</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.button, loading && styles.buttonDisabled]}
+              onPress={handleLogin}
+              disabled={loading}
+              activeOpacity={0.85}
+            >
+              {loading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.buttonText}>Login</Text>
+              )}
+            </TouchableOpacity>
+
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>Don't have an account? </Text>
+              <TouchableOpacity onPress={() => navigation.navigate("Register")}>
+                <Text style={[styles.linkText, { fontWeight: "bold" }]}>
+                  Register
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -156,8 +189,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation, route }) => {
         duration={4000}
         style={styles.snackbar}
         action={{
-          label: 'OK',
-          labelStyle: { color: '#FFF' },
+          label: "OK",
+          labelStyle: { color: "#FFF" },
           onPress: () => setSuccessVisible(false),
         }}
       >
@@ -220,11 +253,19 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   button: {
+    minHeight: 48,
+    backgroundColor: COLORS.primary,
     borderRadius: 8,
     marginTop: SPACING.sm,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  buttonContent: {
-    paddingVertical: 8,
+  buttonDisabled: {
+    opacity: 0.7,
+  },
+  buttonText: {
+    color: COLORS.onPrimary,
+    fontWeight: "700",
   },
   footer: {
     flexDirection: "row",

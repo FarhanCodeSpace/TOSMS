@@ -1,26 +1,38 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, Platform, KeyboardAvoidingView, ScrollView } from 'react-native';
-import { TextInput, Button, Text, HelperText, Snackbar } from 'react-native-paper';
-import { sendPasswordResetEmail } from 'firebase/auth';
-import { auth } from '@config/firebase';
-import { COLORS, SPACING } from '@constants/theme';
-import { handleFirebaseError } from '@utils/errorHandler';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { AuthStackParamList } from '@navigation/types';
+import React, { useState } from "react";
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  Platform,
+  KeyboardAvoidingView,
+  ScrollView,
+  ActivityIndicator,
+} from "react-native";
+import { TextInput, Text, HelperText, Snackbar } from "react-native-paper";
+import { sendPasswordResetEmail } from "firebase/auth";
+import { auth } from "@config/firebase";
+import { COLORS, SPACING } from "@constants/theme";
+import { handleFirebaseError } from "@utils/errorHandler";
+import { StackNavigationProp } from "@react-navigation/stack";
+import { AuthStackParamList } from "@navigation/types";
 
 type ForgotPasswordScreenProps = {
-  navigation: StackNavigationProp<AuthStackParamList, 'ForgotPassword'>;
+  navigation: StackNavigationProp<AuthStackParamList, "ForgotPassword">;
 };
 
-const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({ navigation }) => {
-  const [email, setEmail] = useState('');
+const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({
+  navigation,
+}) => {
+  const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [visible, setVisible] = useState(false);
 
   const handleResetPassword = async () => {
+    if (isLoading) return;
+
     if (!email) {
-      setError('Please enter your email address');
+      setError("Please enter your email address");
       return;
     }
 
@@ -39,7 +51,7 @@ const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({ navigation 
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={{ flex: 1, backgroundColor: COLORS.background }}
     >
       <ScrollView
@@ -47,63 +59,66 @@ const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({ navigation 
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-      <View style={styles.header}>
-        <Text style={styles.title}>Reset Password</Text>
-        <Text style={styles.subtitle}>Enter your email to receive a reset link</Text>
-      </View>
+        <View style={styles.header}>
+          <Text style={styles.title}>Reset Password</Text>
+          <Text style={styles.subtitle}>
+            Enter your email to receive a reset link
+          </Text>
+        </View>
 
-      <View style={styles.form}>
-        <TextInput
-          label="Email"
-          value={email}
-          onChangeText={setEmail}
-          mode="outlined"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          outlineColor={COLORS.primary}
-          activeOutlineColor={COLORS.primary}
-          style={styles.input}
-          disabled={isLoading}
-        />
+        <View style={styles.form}>
+          <TextInput
+            label="Email"
+            value={email}
+            onChangeText={setEmail}
+            mode="outlined"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            outlineColor={COLORS.primary}
+            activeOutlineColor={COLORS.primary}
+            style={styles.input}
+            disabled={isLoading}
+          />
 
-        {error && (
-          <HelperText type="error" visible={!!error} style={styles.errorText}>
-            {error}
-          </HelperText>
-        )}
+          {error && (
+            <HelperText type="error" visible={!!error} style={styles.errorText}>
+              {error}
+            </HelperText>
+          )}
 
-        <Button
-          mode="contained"
-          onPress={handleResetPassword}
-          loading={isLoading}
-          disabled={isLoading}
-          style={styles.button}
-          contentStyle={styles.buttonContent}
-          buttonColor={COLORS.primary}
+          <TouchableOpacity
+            style={[styles.button, isLoading && styles.buttonDisabled]}
+            onPress={handleResetPassword}
+            disabled={isLoading}
+            activeOpacity={0.85}
+          >
+            {isLoading ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.buttonText}>Send Reset Link</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.goBack}
+          >
+            <Text style={styles.linkText}>Back to Login</Text>
+          </TouchableOpacity>
+        </View>
+
+        <Snackbar
+          visible={visible}
+          onDismiss={() => setVisible(false)}
+          duration={3000}
+          action={{
+            label: "OK",
+            onPress: () => navigation.navigate("Login"),
+          }}
+          style={styles.snackbar}
         >
-          Send Reset Link
-        </Button>
-
-        <TouchableOpacity 
-          onPress={() => navigation.goBack()}
-          style={styles.goBack}
-        >
-          <Text style={styles.linkText}>Back to Login</Text>
-        </TouchableOpacity>
-      </View>
-
-      <Snackbar
-        visible={visible}
-        onDismiss={() => setVisible(false)}
-        duration={3000}
-        action={{
-          label: 'OK',
-          onPress: () => navigation.navigate('Login'),
-        }}
-        style={styles.snackbar}
-      >
-        Password reset email sent! Check your inbox.
-      </Snackbar>
+          Password reset email sent! Check your inbox.
+        </Snackbar>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -115,48 +130,56 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     padding: SPACING.lg,
     paddingBottom: 10,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   header: {
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: SPACING.xl,
   },
   title: {
     fontSize: 28,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: COLORS.primary,
   },
   subtitle: {
     fontSize: 14,
     color: COLORS.textSecondary,
     marginTop: SPACING.xs,
-    textAlign: 'center',
+    textAlign: "center",
   },
   form: {
-    width: '100%',
+    width: "100%",
   },
   input: {
     marginBottom: SPACING.md,
     backgroundColor: COLORS.surface,
   },
   errorText: {
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: SPACING.sm,
   },
   button: {
+    minHeight: 48,
+    backgroundColor: COLORS.primary,
     borderRadius: 8,
     marginTop: SPACING.sm,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  buttonContent: {
-    paddingVertical: 8,
+  buttonDisabled: {
+    opacity: 0.7,
+  },
+  buttonText: {
+    color: COLORS.onPrimary,
+    fontWeight: "700",
   },
   goBack: {
     marginTop: SPACING.xl,
-    alignItems: 'center',
+    alignItems: "center",
   },
   linkText: {
     color: COLORS.primary,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   snackbar: {
     backgroundColor: COLORS.success,

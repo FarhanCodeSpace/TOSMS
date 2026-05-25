@@ -1,13 +1,20 @@
 import React, { useState } from "react";
-import { View, StyleSheet, TouchableOpacity, Platform, KeyboardAvoidingView, ScrollView } from "react-native";
-import { TextInput, Button, Text, HelperText } from "react-native-paper";
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  Platform,
+  KeyboardAvoidingView,
+  ScrollView,
+  ActivityIndicator,
+} from "react-native";
+import { TextInput, Text, HelperText } from "react-native-paper";
 import { useAuth } from "@hooks/useAuth";
 import { COLORS, SPACING } from "@constants/theme";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { AuthStackParamList } from "@navigation/types";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { handleFirebaseError } from "@utils/errorHandler";
-
 
 type RegisterScreenProps = {
   navigation: StackNavigationProp<AuthStackParamList, "Register">;
@@ -22,7 +29,7 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [role, setRole] = useState<"student" | "driver">("student");
   const [secureText, setSecureText] = useState(true);
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const validateInputs = () => {
@@ -51,27 +58,30 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
   };
 
   const handleRegister = async () => {
+    if (loading) return;
+
     if (!validateInputs()) return;
 
-    setIsLoading(true);
+    setLoading(true);
     setError(null);
 
     try {
       await register(email, password, fullName, phone, role);
-      navigation.navigate("Login", { 
-        successMessage: "Account created successfully! Please login to continue.",
-        email: email
+      navigation.navigate("Login", {
+        successMessage:
+          "Account created successfully! Please login to continue.",
+        email: email,
       });
     } catch (err: any) {
       setError(handleFirebaseError(err.code));
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={{ flex: 1, backgroundColor: COLORS.background }}
     >
       <ScrollView
@@ -79,166 +89,228 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-      <View style={styles.header}>
-        <View style={styles.logoContainer}>
-          <MaterialCommunityIcons name="bus-clock" size={40} color="white" />
+        <View style={styles.header}>
+          <View style={styles.logoContainer}>
+            <MaterialCommunityIcons name="bus-clock" size={40} color="white" />
+          </View>
+          <Text style={styles.logoText}>TOSMS</Text>
+          <Text style={styles.subtitle}>
+            Create your account to get started
+          </Text>
         </View>
-        <Text style={styles.logoText}>TOSMS</Text>
-        <Text style={styles.subtitle}>Create your account to get started</Text>
-      </View>
 
-      <View style={styles.roleSelection}>
-        <TouchableOpacity
-          style={[
-            styles.roleButton,
-            role === "student"
-              ? styles.roleButtonActive
-              : styles.roleButtonInactive,
-          ]}
-          onPress={() => setRole("student")}
-        >
-          <Text
+        <View style={styles.roleSelection}>
+          <TouchableOpacity
             style={[
-              styles.roleText,
+              styles.roleButton,
               role === "student"
-                ? styles.roleTextActive
-                : styles.roleTextInactive,
+                ? styles.roleButtonActive
+                : styles.roleButtonInactive,
             ]}
+            onPress={() => setRole("student")}
           >
-            <MaterialCommunityIcons 
-              name="account-school" 
-              size={18} 
-              color={role === "student" ? COLORS.surface : COLORS.primary} 
-            /> Student
-          </Text>
-        </TouchableOpacity>
+            <Text
+              style={[
+                styles.roleText,
+                role === "student"
+                  ? styles.roleTextActive
+                  : styles.roleTextInactive,
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="school"
+                size={18}
+                color={role === "student" ? COLORS.surface : COLORS.primary}
+              />{" "}
+              Student
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[
-            styles.roleButton,
-            role === "driver"
-              ? styles.roleButtonActive
-              : styles.roleButtonInactive,
-          ]}
-          onPress={() => setRole("driver")}
-        >
-          <Text
+          <TouchableOpacity
             style={[
-              styles.roleText,
+              styles.roleButton,
               role === "driver"
-                ? styles.roleTextActive
-                : styles.roleTextInactive,
+                ? styles.roleButtonActive
+                : styles.roleButtonInactive,
             ]}
+            onPress={() => setRole("driver")}
           >
-            <MaterialCommunityIcons 
-              name="steering" 
-              size={18} 
-              color={role === "driver" ? COLORS.surface : COLORS.primary} 
-            /> Driver
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.form}>
-        <TextInput
-          label="Full Name"
-          value={fullName}
-          onChangeText={setFullName}
-          mode="outlined"
-          outlineColor={COLORS.primary}
-          activeOutlineColor={COLORS.primary}
-          style={styles.input}
-          disabled={isLoading}
-          left={<TextInput.Icon icon={() => <MaterialCommunityIcons name="account-outline" size={24} color={COLORS.textSecondary} />} />}
-        />
-
-        <TextInput
-          label="Email"
-          value={email}
-          onChangeText={setEmail}
-          mode="outlined"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          outlineColor={COLORS.primary}
-          activeOutlineColor={COLORS.primary}
-          style={styles.input}
-          disabled={isLoading}
-          left={<TextInput.Icon icon={() => <MaterialCommunityIcons name="email-outline" size={24} color={COLORS.textSecondary} />} />}
-        />
-
-        <TextInput
-          label="Phone Number"
-          value={phone}
-          onChangeText={setPhone}
-          mode="outlined"
-          keyboardType="phone-pad"
-          maxLength={11}
-          placeholder="03XXXXXXXXX"
-          outlineColor={COLORS.primary}
-          activeOutlineColor={COLORS.primary}
-          style={styles.input}
-          disabled={isLoading}
-          left={<TextInput.Icon icon={() => <MaterialCommunityIcons name="phone-outline" size={24} color={COLORS.textSecondary} />} />}
-        />
-
-        <TextInput
-          label="Password"
-          value={password}
-          onChangeText={setPassword}
-          mode="outlined"
-          secureTextEntry={secureText}
-          outlineColor={COLORS.primary}
-          activeOutlineColor={COLORS.primary}
-          style={styles.input}
-          disabled={isLoading}
-          left={<TextInput.Icon icon={() => <MaterialCommunityIcons name="lock-outline" size={24} color={COLORS.textSecondary} />} />}
-          right={
-            <TextInput.Icon
-              icon={() => <MaterialCommunityIcons name={secureText ? "eye-outline" : "eye-off-outline"} size={24} color={COLORS.textSecondary} />}
-              onPress={() => setSecureText(!secureText)}
-            />
-          }
-        />
-
-        <TextInput
-          label="Confirm Password"
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-          mode="outlined"
-          secureTextEntry={secureText}
-          outlineColor={COLORS.primary}
-          activeOutlineColor={COLORS.primary}
-          style={styles.input}
-          disabled={isLoading}
-          left={<TextInput.Icon icon={() => <MaterialCommunityIcons name="lock-outline" size={24} color={COLORS.textSecondary} />} />}
-        />
-
-        {error && (
-          <HelperText type="error" visible={!!error} style={styles.errorText}>
-            {error}
-          </HelperText>
-        )}
-
-        <Button
-          mode="contained"
-          onPress={handleRegister}
-          loading={isLoading}
-          disabled={isLoading}
-          style={styles.button}
-          contentStyle={styles.buttonContent}
-          buttonColor={COLORS.primary}
-          textColor={COLORS.onPrimary}
-        >
-          Register
-        </Button>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Already have an account? </Text>
-          <TouchableOpacity onPress={() => navigation.navigate("Login")}>
-            <Text style={[styles.linkText, { fontWeight: "bold" }]}>Login</Text>
+            <Text
+              style={[
+                styles.roleText,
+                role === "driver"
+                  ? styles.roleTextActive
+                  : styles.roleTextInactive,
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="steering"
+                size={18}
+                color={role === "driver" ? COLORS.surface : COLORS.primary}
+              />{" "}
+              Driver
+            </Text>
           </TouchableOpacity>
         </View>
-      </View>
+
+        <View style={styles.form}>
+          <TextInput
+            label="Full Name"
+            value={fullName}
+            onChangeText={setFullName}
+            mode="outlined"
+            outlineColor={COLORS.primary}
+            activeOutlineColor={COLORS.primary}
+            style={styles.input}
+            disabled={loading}
+            left={
+              <TextInput.Icon
+                icon={() => (
+                  <MaterialCommunityIcons
+                    name="account-outline"
+                    size={24}
+                    color={COLORS.textSecondary}
+                  />
+                )}
+              />
+            }
+          />
+
+          <TextInput
+            label="Email"
+            value={email}
+            onChangeText={setEmail}
+            mode="outlined"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            outlineColor={COLORS.primary}
+            activeOutlineColor={COLORS.primary}
+            style={styles.input}
+            disabled={loading}
+            left={
+              <TextInput.Icon
+                icon={() => (
+                  <MaterialCommunityIcons
+                    name="email-outline"
+                    size={24}
+                    color={COLORS.textSecondary}
+                  />
+                )}
+              />
+            }
+          />
+
+          <TextInput
+            label="Phone Number"
+            value={phone}
+            onChangeText={setPhone}
+            mode="outlined"
+            keyboardType="phone-pad"
+            maxLength={11}
+            placeholder="03XXXXXXXXX"
+            outlineColor={COLORS.primary}
+            activeOutlineColor={COLORS.primary}
+            style={styles.input}
+            disabled={loading}
+            left={
+              <TextInput.Icon
+                icon={() => (
+                  <MaterialCommunityIcons
+                    name="phone-outline"
+                    size={24}
+                    color={COLORS.textSecondary}
+                  />
+                )}
+              />
+            }
+          />
+
+          <TextInput
+            label="Password"
+            value={password}
+            onChangeText={setPassword}
+            mode="outlined"
+            secureTextEntry={secureText}
+            outlineColor={COLORS.primary}
+            activeOutlineColor={COLORS.primary}
+            style={styles.input}
+            disabled={loading}
+            left={
+              <TextInput.Icon
+                icon={() => (
+                  <MaterialCommunityIcons
+                    name="lock-outline"
+                    size={24}
+                    color={COLORS.textSecondary}
+                  />
+                )}
+              />
+            }
+            right={
+              <TextInput.Icon
+                icon={() => (
+                  <MaterialCommunityIcons
+                    name={secureText ? "eye-outline" : "eye-off-outline"}
+                    size={24}
+                    color={COLORS.textSecondary}
+                  />
+                )}
+                onPress={() => setSecureText(!secureText)}
+              />
+            }
+          />
+
+          <TextInput
+            label="Confirm Password"
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            mode="outlined"
+            secureTextEntry={secureText}
+            outlineColor={COLORS.primary}
+            activeOutlineColor={COLORS.primary}
+            style={styles.input}
+            disabled={loading}
+            left={
+              <TextInput.Icon
+                icon={() => (
+                  <MaterialCommunityIcons
+                    name="lock-outline"
+                    size={24}
+                    color={COLORS.textSecondary}
+                  />
+                )}
+              />
+            }
+          />
+
+          {error && (
+            <HelperText type="error" visible={!!error} style={styles.errorText}>
+              {error}
+            </HelperText>
+          )}
+
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleRegister}
+            disabled={loading}
+            activeOpacity={0.85}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.buttonText}>Register</Text>
+            )}
+          </TouchableOpacity>
+
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Already have an account? </Text>
+            <TouchableOpacity onPress={() => navigation.navigate("Login")}>
+              <Text style={[styles.linkText, { fontWeight: "bold" }]}>
+                Login
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -320,11 +392,19 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
   button: {
+    minHeight: 48,
+    backgroundColor: COLORS.primary,
     borderRadius: 8,
     marginTop: SPACING.sm,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  buttonContent: {
-    paddingVertical: 8,
+  buttonDisabled: {
+    opacity: 0.7,
+  },
+  buttonText: {
+    color: COLORS.onPrimary,
+    fontWeight: "700",
   },
   footer: {
     flexDirection: "row",

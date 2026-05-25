@@ -3,7 +3,6 @@ import {
   View,
   StyleSheet,
   ScrollView,
-  RefreshControl,
   TouchableOpacity,
   ActivityIndicator,
   Animated,
@@ -20,7 +19,6 @@ import {
   collection,
   query,
   where,
-  getDocs,
   onSnapshot,
   doc,
   getDoc,
@@ -54,7 +52,6 @@ const DriverHomeScreen: React.FC<DriverHomeScreenProps> = ({ navigation }) => {
   const [todayBoardedCount, setTodayBoardedCount] = useState(0);
   const [rideLoading, setRideLoading] = useState(true);
   const [routeLoading, setRouteLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
 
   const [pulseAnim] = useState(new Animated.Value(1));
 
@@ -75,6 +72,12 @@ const DriverHomeScreen: React.FC<DriverHomeScreenProps> = ({ navigation }) => {
       const auth = getAuth();
 
       const cleanups: (() => void)[] = [];
+      let currentRouteRelatedCleanups: (() => void)[] = [];
+
+      const clearRouteRelatedCleanups = () => {
+        currentRouteRelatedCleanups.forEach((fn) => fn());
+        currentRouteRelatedCleanups = [];
+      };
 
       // Availability Listener
       const tomorrowStr = getPakistanTomorrowString();
@@ -105,85 +108,105 @@ const DriverHomeScreen: React.FC<DriverHomeScreenProps> = ({ navigation }) => {
             collection(db, COLLECTIONS.ROUTES),
             where("assignedDriverId", "==", currentUser.uid),
           );
-          const routeSnap = await getDocs(routeQuery);
 
-          if (!routeSnap.empty) {
-            const routeDoc = routeSnap.docs[0];
-            const routeData = {
-              routeId: routeDoc.id,
-              ...routeDoc.data(),
-            } as Route & { routeId: string };
+          const unsubRoute = onSnapshot(
+            routeQuery,
+            (routeSnap) => {
+              if (!auth.currentUser) return;
 
-            setMyRoute(routeData);
-            setRouteLoading(false);
+              clearRouteRelatedCleanups();
 
-            const todayStr = getPakistanTodayString();
-            const studentIds = routeData.studentIds || [];
+              if (routeSnap.empty) {
+                setMyRoute(null);
+                setRouteLoading(false);
+                setRideLoading(false);
+                return;
+              }
 
-            if (studentIds.length > 0) {
-              const todayStatusMap: Record<string, boolean> = {};
-              const todayBoardedMap: Record<string, boolean> = {};
+              const routeDoc = routeSnap.docs[0];
+              const routeData = {
+                routeId: routeDoc.id,
+                ...routeDoc.data(),
+              } as Route & { routeId: string };
 
-              studentIds.forEach((sid: string) => {
-                const docId = `${sid}_${todayStr}`;
-                const unsub = onSnapshot(
-                  doc(db, COLLECTIONS.AVAILABILITY, docId),
-                  (docSnap) => {
-                    if (!auth.currentUser) return;
-                    const data = docSnap.exists() ? docSnap.data() : null;
-                    todayStatusMap[sid] = data?.isAvailable === true;
-                    todayBoardedMap[sid] = data?.boarded === true;
+              setMyRoute(routeData);
+              setRouteLoading(false);
 
-                    const availableCount =
-                      Object.values(todayStatusMap).filter(Boolean).length;
-                    const boardedCount =
-                      Object.values(todayBoardedMap).filter(Boolean).length;
+              const todayStr = getPakistanTodayString();
+              const studentIds = routeData.studentIds || [];
 
-                    setTodayAvailableCount(availableCount);
-                    setTodayBoardedCount(boardedCount);
-                  },
-                  (error: any) => {
-                    if (error.code === "permission-denied") return;
-                    console.error("Student availability listener error:", error);
-                  }
-                );
-                cleanups.push(unsub);
-              });
-            }
+              if (studentIds.length > 0) {
+                const todayStatusMap: Record<string, boolean> = {};
+                const todayBoardedMap: Record<string, boolean> = {};
 
-            const ridesQuery = query(
-              collection(db, COLLECTIONS.RIDES),
-              where("routeId", "==", routeDoc.id),
-              where("status", "in", ["scheduled", "active", "completed"]),
-            );
+                studentIds.forEach((sid: string) => {
+                  const docId = `${sid}_${todayStr}`;
+                  const unsub = onSnapshot(
+                    doc(db, COLLECTIONS.AVAILABILITY, docId),
+                    (docSnap) => {
+                      if (!auth.currentUser) return;
+                      const data = docSnap.exists() ? docSnap.data() : null;
+                      todayStatusMap[sid] = data?.isAvailable === true;
+                      todayBoardedMap[sid] = data?.boarded === true;
 
-            const unsubRides = onSnapshot(
-              ridesQuery,
-              (snapshot) => {
-                if (!auth.currentUser) return;
-                let found: (Ride & { rideId: string }) | null = null;
-                snapshot.forEach((d) => {
-                  const rData = d.data();
-                  if (rData.date === todayStr) {
-                    found = { rideId: d.id, ...rData } as Ride & {
-                      rideId: string;
-                    };
-                  }
+                      const availableCount =
+                        Object.values(todayStatusMap).filter(Boolean).length;
+                      const boardedCount =
+                        Object.values(todayBoardedMap).filter(Boolean).length;
+
+                      setTodayAvailableCount(availableCount);
+                      setTodayBoardedCount(boardedCount);
+                    },
+                    (error: any) => {
+                      if (error.code === "permission-denied") return;
+                      console.error(
+                        "Student availability listener error:",
+                        error,
+                      );
+                    },
+                  );
+                  currentRouteRelatedCleanups.push(unsub);
                 });
-                setTodayRide(found);
-                setRideLoading(false);
-              },
-              (err: any) => {
-                if (err.code === "permission-denied") return;
-                console.error("Ride listener error:", err);
-                setRideLoading(false);
-              },
-            );
-            cleanups.push(unsubRides);
-          } else {
-            setRouteLoading(false);
-            setRideLoading(false);
-          }
+              }
+
+              const ridesQuery = query(
+                collection(db, COLLECTIONS.RIDES),
+                where("routeId", "==", routeDoc.id),
+                where("status", "in", ["scheduled", "active", "completed"]),
+              );
+
+              const unsubRides = onSnapshot(
+                ridesQuery,
+                (snapshot) => {
+                  if (!auth.currentUser) return;
+                  let found: (Ride & { rideId: string }) | null = null;
+                  snapshot.forEach((d) => {
+                    const rData = d.data();
+                    if (rData.date === todayStr) {
+                      found = { rideId: d.id, ...rData } as Ride & {
+                        rideId: string;
+                      };
+                    }
+                  });
+                  setTodayRide(found);
+                  setRideLoading(false);
+                },
+                (err: any) => {
+                  if (err.code === "permission-denied") return;
+                  console.error("Ride listener error:", err);
+                  setRideLoading(false);
+                },
+              );
+              currentRouteRelatedCleanups.push(unsubRides);
+            },
+            (error: any) => {
+              if (error.code === "permission-denied") return;
+              console.error("Route listener error:", error);
+              setRouteLoading(false);
+              setRideLoading(false);
+            },
+          );
+          cleanups.push(unsubRoute);
         } catch (error) {
           console.error("Error in fetchRouteAndRides:", error);
           setRouteLoading(false);
@@ -194,9 +217,10 @@ const DriverHomeScreen: React.FC<DriverHomeScreenProps> = ({ navigation }) => {
       fetchRouteAndRides();
 
       return () => {
+        clearRouteRelatedCleanups();
         cleanups.forEach((fn) => fn());
       };
-    }, [currentUser?.uid])
+    }, [currentUser?.uid]),
   );
 
   useEffect(() => {
@@ -221,11 +245,6 @@ const DriverHomeScreen: React.FC<DriverHomeScreenProps> = ({ navigation }) => {
       pulseAnim.setValue(1);
     }
   }, [todayRide?.status]);
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  };
 
   const getInitials = (name: string) => {
     return (
@@ -276,12 +295,7 @@ const DriverHomeScreen: React.FC<DriverHomeScreenProps> = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      >
+      <ScrollView showsVerticalScrollIndicator={false}>
         {/* ── Header ── */}
         <View style={styles.header}>
           <View style={styles.headerTopRow}>
@@ -470,7 +484,9 @@ const DriverHomeScreen: React.FC<DriverHomeScreenProps> = ({ navigation }) => {
             />
           ) : todayRide?.status === "scheduled" ? (
             <View style={styles.rideScheduledCard}>
-              <View style={[styles.rideAccentBar, { backgroundColor: "#F59E0B" }]} />
+              <View
+                style={[styles.rideAccentBar, { backgroundColor: "#F59E0B" }]}
+              />
               <View style={styles.rideTopRow}>
                 <Text style={styles.rideRouteTitle}>{todayRide.routeName}</Text>
                 <View style={styles.badgeOrange}>
@@ -510,7 +526,9 @@ const DriverHomeScreen: React.FC<DriverHomeScreenProps> = ({ navigation }) => {
             </View>
           ) : todayRide?.status === "active" ? (
             <View style={styles.rideActiveCard}>
-              <View style={[styles.rideAccentBar, { backgroundColor: "#16A34A" }]} />
+              <View
+                style={[styles.rideAccentBar, { backgroundColor: "#16A34A" }]}
+              />
               <View style={styles.rideTopRow}>
                 <Text style={styles.rideRouteTitle}>{todayRide.routeName}</Text>
                 <View style={styles.badgeGreen}>
@@ -532,7 +550,9 @@ const DriverHomeScreen: React.FC<DriverHomeScreenProps> = ({ navigation }) => {
             </View>
           ) : todayRide?.status === "completed" ? (
             <View style={styles.rideCompletedCard}>
-              <View style={[styles.rideAccentBar, { backgroundColor: "#9CA3AF" }]} />
+              <View
+                style={[styles.rideAccentBar, { backgroundColor: "#9CA3AF" }]}
+              />
               <View style={styles.rideTopRow}>
                 <Text style={[styles.rideRouteTitle, { color: "#6B7280" }]}>
                   {todayRide.routeName}
@@ -547,7 +567,12 @@ const DriverHomeScreen: React.FC<DriverHomeScreenProps> = ({ navigation }) => {
                   size={16}
                   color="#16A34A"
                 />
-                <Text style={[styles.rideInfoText, { color: "#16A34A", fontWeight: "600" }]}>
+                <Text
+                  style={[
+                    styles.rideInfoText,
+                    { color: "#16A34A", fontWeight: "600" },
+                  ]}
+                >
                   Ride finished successfully
                 </Text>
                 <View style={styles.flexSpacer} />
@@ -561,7 +586,10 @@ const DriverHomeScreen: React.FC<DriverHomeScreenProps> = ({ navigation }) => {
                 </Text>
               </View>
               <TouchableOpacity
-                style={[styles.actionBtnPrimary, { backgroundColor: "#6B7280", opacity: 0.8 }]}
+                style={[
+                  styles.actionBtnPrimary,
+                  { backgroundColor: "#6B7280", opacity: 0.8 },
+                ]}
                 disabled={true}
               >
                 <MaterialCommunityIcons

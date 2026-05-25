@@ -32,7 +32,7 @@ export interface User {
   fcmToken: string | null;
   expoPushToken: string | null;
   createdAt: Timestamp;
-  status: "active" | "suspended";
+  status: "active" | "pending" | "suspended";
 
   // Student-specific fields (assigned by admin)
   routeId?: string;
@@ -191,4 +191,3 @@ export interface LiveLocation {
   speed: number;
   updatedAt: Timestamp;
 }
-

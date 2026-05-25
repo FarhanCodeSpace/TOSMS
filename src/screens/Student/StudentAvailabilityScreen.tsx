@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -9,36 +9,41 @@ import {
   Platform,
   Keyboard,
   Pressable,
-} from 'react-native';
-import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
-import { Text, TextInput, Button } from 'react-native-paper';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { db } from '@config/firebase';
-import { COLLECTIONS } from '@config/firebaseCollections';
+} from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import { Text, TextInput, Button } from "react-native-paper";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { db } from "@config/firebase";
+import { COLLECTIONS } from "@config/firebaseCollections";
 import {
   collection,
   query,
   where,
-  getDocs,
   doc,
+  onSnapshot,
   setDoc,
   serverTimestamp,
-} from 'firebase/firestore';
-import { useAuth } from '@hooks/useAuth';
-import { COLORS } from '@constants/theme';
-import { getPakistanTomorrowString, formatPakistanDate } from '@utils/dateHelpers';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { StudentHomeStackParamList } from '@navigation/types';
+} from "firebase/firestore";
+import { useAuth } from "@hooks/useAuth";
+import { COLORS } from "@constants/theme";
+import {
+  getPakistanTomorrowString,
+  formatPakistanDate,
+} from "@utils/dateHelpers";
+import { StackNavigationProp } from "@react-navigation/stack";
+import { StudentHomeStackParamList } from "@navigation/types";
 
 type StudentAvailabilityScreenProps = {
-  navigation: StackNavigationProp<StudentHomeStackParamList, 'StudentHome'>;
+  navigation: StackNavigationProp<StudentHomeStackParamList, "StudentHome">;
 };
 
-const StudentAvailabilityScreen: React.FC<StudentAvailabilityScreenProps> = ({ navigation }) => {
+const StudentAvailabilityScreen: React.FC<StudentAvailabilityScreenProps> = ({
+  navigation,
+}) => {
   const { currentUser } = useAuth();
-  
+
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
-  const [reason, setReason] = useState('');
+  const [reason, setReason] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -46,62 +51,69 @@ const StudentAvailabilityScreen: React.FC<StudentAvailabilityScreenProps> = ({ n
   const tomorrowDisplay = formatPakistanDate(tomorrowString);
 
   useEffect(() => {
-    fetchCurrentAvailability();
+    if (!currentUser?.uid) return;
+
+    setIsLoading(true);
+
+    const docId = currentUser.uid + "_" + tomorrowString;
+    const unsubscribe = onSnapshot(
+      doc(db, COLLECTIONS.AVAILABILITY, docId),
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          setIsAvailable(data.isAvailable);
+          setReason(data.note || "");
+        } else {
+          setIsAvailable(null);
+          setReason("");
+        }
+        setIsLoading(false);
+      },
+      (e) => {
+        console.error("Error fetching availability:", e);
+        setIsLoading(false);
+      },
+    );
+
+    return () => unsubscribe();
   }, [currentUser?.uid]);
 
-  const fetchCurrentAvailability = async () => {
-    if (!currentUser?.uid) return;
-    setIsLoading(true);
-    try {
-      const q = query(
-        collection(db, COLLECTIONS.AVAILABILITY),
-        where('userId', '==', currentUser.uid),
-        where('date', '==', tomorrowString)
-      );
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        const data = snap.docs[0].data();
-        setIsAvailable(data.isAvailable);
-        setReason(data.note || '');
-      }
-    } catch (e) {
-      console.error('Error fetching availability:', e);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleConfirm = async () => {
+    if (isSaving) return;
+
     if (isAvailable === null) {
-      Alert.alert('Selection Required', 'Please select whether you are available or not.');
+      Alert.alert(
+        "Selection Required",
+        "Please select whether you are available or not.",
+      );
       return;
     }
-    
+
     if (!currentUser?.uid) return;
-    
+
     setIsSaving(true);
     try {
-      const docId = currentUser.uid + '_' + tomorrowString;
+      const docId = currentUser.uid + "_" + tomorrowString;
       const docRef = doc(db, COLLECTIONS.AVAILABILITY, docId);
-      
+
       await setDoc(docRef, {
         availabilityId: docId,
         userId: currentUser.uid,
         userName: currentUser.fullName,
-        routeId: currentUser.routeId || '',
+        routeId: currentUser.routeId || "",
         date: tomorrowString,
         isAvailable: isAvailable,
         note: reason,
         markedAt: serverTimestamp(),
-        role: 'student'
+        role: "student",
       });
-      
-      Alert.alert('Success', 'Availability marked successfully!', [
-        { text: 'OK', onPress: () => navigation.goBack() }
+
+      Alert.alert("Success", "Availability marked successfully!", [
+        { text: "OK", onPress: () => navigation.goBack() },
       ]);
     } catch (e) {
-      console.error('Error saving availability:', e);
-      Alert.alert('Error', 'Failed to save availability. Please try again.');
+      console.error("Error saving availability:", e);
+      Alert.alert("Error", "Failed to save availability. Please try again.");
     } finally {
       setIsSaving(false);
     }
@@ -116,85 +128,117 @@ const StudentAvailabilityScreen: React.FC<StudentAvailabilityScreenProps> = ({ n
   }
 
   return (
-    <Pressable 
-      style={styles.container} 
+    <Pressable
+      style={styles.container}
       onPress={Keyboard.dismiss}
       accessible={false}
     >
-      <KeyboardAwareScrollView 
+      <KeyboardAwareScrollView
         enableOnAndroid={true}
         extraHeight={120}
         extraScrollHeight={0}
-        contentContainerStyle={styles.scrollContent} 
+        contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
         viewIsInsideTabBar={true}
         enableAutomaticScroll={true}
       >
         {/* ── Back Button ── */}
-        <TouchableOpacity 
-          style={styles.backButton} 
+        <TouchableOpacity
+          style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <MaterialCommunityIcons name="chevron-left" size={28} color={COLORS.text} />
+          <MaterialCommunityIcons
+            name="chevron-left"
+            size={28}
+            color={COLORS.text}
+          />
         </TouchableOpacity>
 
         {/* ── Date Card ── */}
         <View style={styles.dateCard}>
-          <MaterialCommunityIcons name="calendar-clock" size={24} color="white" />
+          <MaterialCommunityIcons
+            name="calendar-clock"
+            size={24}
+            color="white"
+          />
           <View style={styles.dateTextContainer}>
             <Text style={styles.dateLabel}>Tomorrow's Availability</Text>
             <Text style={styles.dateValue}>{tomorrowDisplay}</Text>
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Will you be using the transport?</Text>
+        <Text style={styles.sectionTitle}>
+          Will you be using the transport?
+        </Text>
 
         {/* ── Selection Cards ── */}
         <View style={styles.selectionContainer}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[
               styles.choiceCard,
-              isAvailable === true && styles.choiceCardSelectedAvailable
+              isAvailable === true && styles.choiceCardSelectedAvailable,
             ]}
             onPress={() => setIsAvailable(true)}
           >
-            <MaterialCommunityIcons 
-              name={isAvailable === true ? "check-circle" : "check-circle-outline"} 
-              size={32} 
-              color={isAvailable === true ? "#16A34A" : COLORS.textSecondary} 
+            <MaterialCommunityIcons
+              name={
+                isAvailable === true ? "check-circle" : "check-circle-outline"
+              }
+              size={32}
+              color={isAvailable === true ? "#16A34A" : COLORS.textSecondary}
             />
             <View style={styles.choiceTextContainer}>
-                <Text style={[styles.choiceText, isAvailable === true && styles.choiceTextSelectedAvailable]}>
+              <Text
+                style={[
+                  styles.choiceText,
+                  isAvailable === true && styles.choiceTextSelectedAvailable,
+                ]}
+              >
                 Available
-                </Text>
-                <Text style={styles.choiceSub}>I will be using transport tomorrow</Text>
+              </Text>
+              <Text style={styles.choiceSub}>
+                I will be using transport tomorrow
+              </Text>
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[
               styles.choiceCard,
-              isAvailable === false && styles.choiceCardSelectedUnavailable
+              isAvailable === false && styles.choiceCardSelectedUnavailable,
             ]}
             onPress={() => setIsAvailable(false)}
           >
-            <MaterialCommunityIcons 
-              name={isAvailable === false ? "close-circle" : "close-circle-outline"} 
-              size={32} 
-              color={isAvailable === false ? "#DC2626" : COLORS.textSecondary} 
+            <MaterialCommunityIcons
+              name={
+                isAvailable === false ? "close-circle" : "close-circle-outline"
+              }
+              size={32}
+              color={isAvailable === false ? "#DC2626" : COLORS.textSecondary}
             />
             <View style={styles.choiceTextContainer}>
-                <Text style={[styles.choiceText, isAvailable === false && styles.choiceTextSelectedUnavailable]}>
+              <Text
+                style={[
+                  styles.choiceText,
+                  isAvailable === false && styles.choiceTextSelectedUnavailable,
+                ]}
+              >
                 Not Available
-                </Text>
-                <Text style={styles.choiceSub}>I won't need transport tomorrow</Text>
+              </Text>
+              <Text style={styles.choiceSub}>
+                I won't need transport tomorrow
+              </Text>
             </View>
           </TouchableOpacity>
         </View>
 
         {isAvailable === false && (
           <View style={styles.alertBox}>
-            <MaterialCommunityIcons name="information" size={20} color="#92400E" />
+            <MaterialCommunityIcons
+              name="information"
+              size={20}
+              color="#92400E"
+            />
             <Text style={styles.alertText}>
               Your driver will be notified that you won't need pickup tomorrow.
             </Text>
@@ -218,19 +262,20 @@ const StudentAvailabilityScreen: React.FC<StudentAvailabilityScreenProps> = ({ n
 
         {/* ── Action Button ── */}
         <View style={styles.footer}>
-          <Button
-            mode="contained"
+          <TouchableOpacity
+            style={[styles.confirmBtn, isSaving && styles.confirmBtnDisabled]}
             onPress={handleConfirm}
-            loading={isSaving}
             disabled={isSaving || isAvailable === null}
-            style={styles.confirmBtn}
-            contentStyle={styles.confirmBtnContent}
-            buttonColor={COLORS.primary}
+            activeOpacity={0.85}
           >
-            Confirm Availability
-          </Button>
+            {isSaving ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.confirmBtnText}>Confirm Availability</Text>
+            )}
+          </TouchableOpacity>
         </View>
-        </KeyboardAwareScrollView>
+      </KeyboardAwareScrollView>
     </Pressable>
   );
 };
@@ -238,7 +283,7 @@ const StudentAvailabilityScreen: React.FC<StudentAvailabilityScreenProps> = ({ n
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: "#F9FAFB",
   },
   scrollContent: {
     padding: 20,
@@ -249,30 +294,30 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "white",
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 20,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   dateCard: {
-    backgroundColor: '#1A3C5E',
+    backgroundColor: "#1A3C5E",
     borderRadius: 16,
     padding: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 24,
     elevation: 4,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
@@ -281,20 +326,20 @@ const styles = StyleSheet.create({
     marginLeft: 16,
   },
   dateLabel: {
-    color: 'white',
+    color: "white",
     fontSize: 14,
     opacity: 0.8,
   },
   dateValue: {
-    color: 'white',
+    color: "white",
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: "700",
     marginTop: 2,
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
+    fontWeight: "600",
+    color: "#374151",
     marginBottom: 16,
     paddingLeft: 4,
   },
@@ -303,26 +348,26 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   choiceCard: {
-    backgroundColor: 'white',
+    backgroundColor: "white",
     borderRadius: 16,
     padding: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     borderWidth: 2,
-    borderColor: '#F3F4F6',
+    borderColor: "#F3F4F6",
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
   },
   choiceCardSelectedAvailable: {
-    borderColor: '#16A34A',
-    backgroundColor: '#F0FFF4',
+    borderColor: "#16A34A",
+    backgroundColor: "#F0FFF4",
   },
   choiceCardSelectedUnavailable: {
-    borderColor: '#DC2626',
-    backgroundColor: '#FFF5F5',
+    borderColor: "#DC2626",
+    backgroundColor: "#FFF5F5",
   },
   choiceTextContainer: {
     marginLeft: 16,
@@ -330,35 +375,35 @@ const styles = StyleSheet.create({
   },
   choiceText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
+    fontWeight: "600",
+    color: "#374151",
   },
   choiceSub: {
     fontSize: 12,
-    color: '#6B7280',
+    color: "#6B7280",
     marginTop: 2,
   },
   choiceTextSelectedAvailable: {
-    color: '#16A34A',
+    color: "#16A34A",
   },
   choiceTextSelectedUnavailable: {
-    color: '#DC2626',
+    color: "#DC2626",
   },
   alertBox: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFBEB',
+    flexDirection: "row",
+    backgroundColor: "#FFFBEB",
     padding: 12,
     borderRadius: 12,
-    alignItems: 'center',
+    alignItems: "center",
     gap: 10,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#FEF3C7',
+    borderColor: "#FEF3C7",
     marginTop: 12,
   },
   alertText: {
     fontSize: 13,
-    color: '#92400E',
+    color: "#92400E",
     flex: 1,
   },
   inputContainer: {
@@ -366,24 +411,37 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 15,
-    fontWeight: '500',
-    color: '#1F2937',
+    fontWeight: "500",
+    color: "#1F2937",
     marginBottom: 10,
     paddingLeft: 4,
   },
   textInput: {
-    backgroundColor: 'white',
+    backgroundColor: "white",
   },
   footer: {
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     marginTop: 24,
     marginBottom: 20,
   },
   confirmBtn: {
+    minHeight: 48,
+    backgroundColor: COLORS.primary,
     borderRadius: 12,
+    marginTop: 12,
+    alignItems: "center",
+    justifyContent: "center",
   },
   confirmBtnContent: {
-    paddingVertical: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  confirmBtnDisabled: {
+    opacity: 0.7,
+  },
+  confirmBtnText: {
+    color: "white",
+    fontWeight: "700",
   },
 });
 

@@ -13,7 +13,7 @@ import {
   signOut,
   User as FirebaseUser,
 } from "firebase/auth";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, onSnapshot, setDoc, serverTimestamp } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { auth, db } from "@config/firebase";
 import { COLLECTIONS } from "@config/firebaseCollections";
@@ -21,6 +21,7 @@ import { User } from "@types";
 
 interface AuthContextType {
   currentUser: User | null;
+  // Session restoration state for navigator selection only.
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
@@ -43,8 +44,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  // RootNavigator uses this while Firebase restores the authenticated session.
   const [isLoading, setIsLoading] = useState(true);
   const isRegistering = useRef(false);
+  const userDocUnsubscribeRef = useRef<(() => void) | null>(null);
 
   // Persistence: Save to AsyncStorage
   const saveUserToStorage = useCallback(async (user: User | null) => {
@@ -71,35 +74,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     }
   }, []);
 
-  // Fetch full user doc from Firestore
-  const fetchUserDoc = useCallback(
-    async (uid: string) => {
-      try {
-        const userDoc = await getDoc(doc(db, COLLECTIONS.USERS, uid));
-        if (userDoc.exists()) {
-          const userData = userDoc.data() as User;
-          setCurrentUser(userData);
-          await saveUserToStorage(userData);
-        } else {
-          console.warn(`User document not found for UID: ${uid}`);
-          // If no doc exists, we should probably sign out or handle as incomplete profile
-          // Setting to null for now ensures we don't get stuck in a partial state
-          setCurrentUser(null);
-          await saveUserToStorage(null);
-        }
-      } catch (error: any) {
-        if (error.code === 'failed-precondition' || error.message?.includes('offline')) {
-          console.warn("Firestore is offline, using cached data if available.");
-          // In offline mode, Firestore getDoc might still work if persistence is on
-          // but we'll log it specifically for the user
-        }
-        console.error("Error fetching user document:", error);
-        throw error; // Rethrow to allow caller to handle
-      }
-    },
-    [saveUserToStorage],
-  );
-
   useEffect(() => {
     // Initial load from storage for faster startup
     loadUserFromStorage();
@@ -111,24 +85,59 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
           return; // Ignore auth state changes during registration to avoid flashing the dashboard
         }
 
+        if (userDocUnsubscribeRef.current) {
+          userDocUnsubscribeRef.current();
+          userDocUnsubscribeRef.current = null;
+        }
+
         setIsLoading(true);
         if (firebaseUser) {
-          try {
-            await fetchUserDoc(firebaseUser.uid);
-          } catch (error) {
-            console.error("Auth state change error:", error);
-            setCurrentUser(null);
-          }
+          userDocUnsubscribeRef.current = onSnapshot(
+            doc(db, COLLECTIONS.USERS, firebaseUser.uid),
+            async (userDoc) => {
+              if (userDoc.exists()) {
+                const userData = userDoc.data() as User;
+                setCurrentUser(userData);
+                await saveUserToStorage(userData);
+              } else {
+                console.warn(
+                  `User document not found for UID: ${firebaseUser.uid}`,
+                );
+                setCurrentUser(null);
+                await saveUserToStorage(null);
+              }
+              setIsLoading(false);
+            },
+            (error: any) => {
+              if (
+                error.code === "failed-precondition" ||
+                error.message?.includes("offline")
+              ) {
+                console.warn(
+                  "Firestore is offline, using cached data if available.",
+                );
+              }
+              console.error("Error fetching user document:", error);
+              setCurrentUser(null);
+              setIsLoading(false);
+            },
+          );
         } else {
           setCurrentUser(null);
           await saveUserToStorage(null);
+          setIsLoading(false);
         }
-        setIsLoading(false);
       },
     );
 
-    return unsubscribe;
-  }, [loadUserFromStorage, fetchUserDoc, saveUserToStorage]);
+    return () => {
+      if (userDocUnsubscribeRef.current) {
+        userDocUnsubscribeRef.current();
+        userDocUnsubscribeRef.current = null;
+      }
+      unsubscribe();
+    };
+  }, [loadUserFromStorage, saveUserToStorage]);
 
   const login = async (email: string, password: string) => {
     try {
@@ -154,7 +163,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       );
       const { uid } = userCredential.user;
 
-      const newUser: User = {
+      const newUser: any = {
         uid,
         fullName,
         email,
@@ -163,17 +172,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         profileImageUrl: null,
         fcmToken: null,
         expoPushToken: null,
-        createdAt: serverTimestamp() as any, // Cast for simplicity in this initial state
-        status: "active",
-        ...(role === "driver"
-          ? {
-              approved: false,
-              totalRides: 0,
-              rating: 0,
-              profileComplete: false,
-            }
-          : {}),
+        createdAt: serverTimestamp(),
       };
+
+      if (role === "driver") {
+        newUser.approved = false;
+        newUser.status = "pending";
+        newUser.profileComplete = false;
+        newUser.rating = 0;
+        newUser.totalRides = 0;
+        newUser.routeId = "";
+        newUser.vehicleType = "";
+        newUser.vehiclePlate = "";
+        newUser.vehicleCapacity = 0;
+        newUser.cnic = "";
+      } else {
+        newUser.status = "active";
+        newUser.routeId = "";
+        newUser.pickupStop = "";
+      }
 
       await setDoc(doc(db, COLLECTIONS.USERS, uid), newUser);
       // Ensure user is signed out so they have to login manually

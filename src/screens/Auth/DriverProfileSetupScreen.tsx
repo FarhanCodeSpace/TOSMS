@@ -7,16 +7,16 @@ import {
   Image,
   Platform,
   KeyboardAvoidingView,
+  ActivityIndicator,
 } from "react-native";
 import {
   TextInput,
-  Button,
   Text,
   SegmentedButtons,
   HelperText,
 } from "react-native-paper";
 import * as ImagePicker from "expo-image-picker";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
 import { db } from "@config/firebase";
 import { COLLECTIONS } from "@config/firebaseCollections";
 import { useAuth } from "@hooks/useAuth";
@@ -42,7 +42,7 @@ const DriverProfileSetupScreen: React.FC<DriverProfileSetupScreenProps> = ({
   const [vehicleType, setVehicleType] = useState("van");
   const [plateNumber, setPlateNumber] = useState("");
   const [capacity, setCapacity] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const pickImage = async () => {
@@ -80,6 +80,8 @@ const DriverProfileSetupScreen: React.FC<DriverProfileSetupScreenProps> = ({
   };
 
   const handleSubmit = async () => {
+    if (loading) return;
+
     if (!profileImage) {
       setError("Please select a profile photo");
       return;
@@ -93,7 +95,7 @@ const DriverProfileSetupScreen: React.FC<DriverProfileSetupScreenProps> = ({
       return;
     }
 
-    setIsLoading(true);
+    setLoading(true);
     setError(null);
 
     try {
@@ -109,28 +111,25 @@ const DriverProfileSetupScreen: React.FC<DriverProfileSetupScreenProps> = ({
         vehiclePlate: plateNumber,
         vehicleCapacity: parseInt(capacity),
         profileComplete: true,
-        // Auto-approve for development/testing purposes
-        approved: true,
       };
 
       if (currentUser?.uid) {
-        await updateDoc(
-          doc(db, COLLECTIONS.USERS, currentUser.uid),
-          driverData,
-        );
+        await setDoc(doc(db, COLLECTIONS.USERS, currentUser.uid), driverData, {
+          merge: true,
+        });
         updateUser(driverData);
         navigation.navigate("DriverPending");
       }
     } catch (err: any) {
-      setError(handleFirebaseError(err.code) || 'Failed to update profile.');
+      setError(handleFirebaseError(err.code) || "Failed to update profile.");
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={{ flex: 1, backgroundColor: COLORS.background }}
     >
       <ScrollView
@@ -138,88 +137,89 @@ const DriverProfileSetupScreen: React.FC<DriverProfileSetupScreenProps> = ({
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-      <Text style={styles.title}>Complete Your Profile</Text>
-      <Text style={styles.subtitle}>
-        Fill in your details to start as a driver
-      </Text>
+        <Text style={styles.title}>Complete Your Profile</Text>
+        <Text style={styles.subtitle}>
+          Fill in your details to start as a driver
+        </Text>
 
-      <TouchableOpacity onPress={pickImage} style={styles.imagePicker}>
-        {profileImage ? (
-          <Image source={{ uri: profileImage }} style={styles.profileImage} />
-        ) : (
-          <View style={styles.imagePlaceholder}>
-            <Text style={styles.imagePlaceholderText}>Add Photo</Text>
-          </View>
-        )}
-      </TouchableOpacity>
+        <TouchableOpacity onPress={pickImage} style={styles.imagePicker}>
+          {profileImage ? (
+            <Image source={{ uri: profileImage }} style={styles.profileImage} />
+          ) : (
+            <View style={styles.imagePlaceholder}>
+              <Text style={styles.imagePlaceholderText}>Add Photo</Text>
+            </View>
+          )}
+        </TouchableOpacity>
 
-      <View style={styles.form}>
-        <TextInput
-          label="CNIC (XXXXX-XXXXXXX-X)"
-          value={cnic}
-          onChangeText={handleCnicChange}
-          mode="outlined"
-          keyboardType="numeric"
-          outlineColor={COLORS.primary}
-          activeOutlineColor={COLORS.primary}
-          style={styles.input}
-          disabled={isLoading}
-        />
+        <View style={styles.form}>
+          <TextInput
+            label="CNIC (XXXXX-XXXXXXX-X)"
+            value={cnic}
+            onChangeText={handleCnicChange}
+            mode="outlined"
+            keyboardType="numeric"
+            outlineColor={COLORS.primary}
+            activeOutlineColor={COLORS.primary}
+            style={styles.input}
+            disabled={loading}
+          />
 
-        <Text style={styles.label}>Vehicle Type</Text>
-        <SegmentedButtons
-          value={vehicleType}
-          onValueChange={setVehicleType}
-          buttons={[
-            { value: "van", label: "Van" },
-            { value: "bus", label: "Bus" },
-            { value: "coaster", label: "Coaster" },
-          ]}
-          style={styles.segmentedButtons}
-        />
+          <Text style={styles.label}>Vehicle Type</Text>
+          <SegmentedButtons
+            value={vehicleType}
+            onValueChange={setVehicleType}
+            buttons={[
+              { value: "van", label: "Van" },
+              { value: "bus", label: "Bus" },
+              { value: "coaster", label: "Coaster" },
+            ]}
+            style={styles.segmentedButtons}
+          />
 
-        <TextInput
-          label="Vehicle Plate Number"
-          value={plateNumber}
-          onChangeText={setPlateNumber}
-          mode="outlined"
-          autoCapitalize="characters"
-          outlineColor={COLORS.primary}
-          activeOutlineColor={COLORS.primary}
-          style={styles.input}
-          disabled={isLoading}
-        />
+          <TextInput
+            label="Vehicle Plate Number"
+            value={plateNumber}
+            onChangeText={setPlateNumber}
+            mode="outlined"
+            autoCapitalize="characters"
+            outlineColor={COLORS.primary}
+            activeOutlineColor={COLORS.primary}
+            style={styles.input}
+            disabled={loading}
+          />
 
-        <TextInput
-          label="Vehicle Capacity"
-          value={capacity}
-          onChangeText={setCapacity}
-          mode="outlined"
-          keyboardType="numeric"
-          outlineColor={COLORS.primary}
-          activeOutlineColor={COLORS.primary}
-          style={styles.input}
-          disabled={isLoading}
-        />
+          <TextInput
+            label="Vehicle Capacity"
+            value={capacity}
+            onChangeText={setCapacity}
+            mode="outlined"
+            keyboardType="numeric"
+            outlineColor={COLORS.primary}
+            activeOutlineColor={COLORS.primary}
+            style={styles.input}
+            disabled={loading}
+          />
 
-        {error && (
-          <HelperText type="error" visible={!!error} style={styles.errorText}>
-            {error}
-          </HelperText>
-        )}
+          {error && (
+            <HelperText type="error" visible={!!error} style={styles.errorText}>
+              {error}
+            </HelperText>
+          )}
 
-        <Button
-          mode="contained"
-          onPress={handleSubmit}
-          loading={isLoading}
-          disabled={isLoading}
-          style={styles.button}
-          contentStyle={styles.buttonContent}
-          buttonColor={COLORS.primary}
-        >
-          Submit Profile
-        </Button>
-      </View>
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleSubmit}
+            disabled={loading}
+            activeOpacity={0.85}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.buttonText}>Submit Profile</Text>
+            )}
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -288,11 +288,19 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
   button: {
+    minHeight: 48,
+    backgroundColor: COLORS.primary,
     borderRadius: 8,
     marginTop: SPACING.lg,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  buttonContent: {
-    paddingVertical: 8,
+  buttonDisabled: {
+    opacity: 0.7,
+  },
+  buttonText: {
+    color: COLORS.onPrimary,
+    fontWeight: "700",
   },
 });
 

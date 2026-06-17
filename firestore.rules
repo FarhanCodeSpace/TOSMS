@@ -44,9 +44,14 @@ service cloud.firestore {
     // Rides
     match /rides/{rideId} {
       allow read: if isAuthenticated();
-      allow create: if isAdmin();
+      allow create: if isAuthenticated() && (
+        isAdmin() ||
+        request.resource.data.driverId == request.auth.uid ||
+        request.resource.data.assignedDriverId == request.auth.uid
+      );
       allow update: if isAuthenticated() && (
         isAdmin() ||
+        resource.data.driverId == request.auth.uid ||
         resource.data.assignedDriverId == request.auth.uid
       );
       allow delete: if isAdmin();
@@ -61,6 +66,22 @@ service cloud.firestore {
         isOwner(resource.data.userId);
       allow delete: if isAuthenticated() &&
         isOwner(resource.data.userId);
+    }
+
+    // Bookings
+    match /bookings/{bookingId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        isOwner(resource.data.studentId)
+      );
+      allow create: if isAuthenticated() &&
+        isStudent() &&
+        isOwner(request.resource.data.studentId);
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        isOwner(resource.data.studentId)
+      );
+      allow delete: if isAdmin();
     }
 
     // Fee Payments

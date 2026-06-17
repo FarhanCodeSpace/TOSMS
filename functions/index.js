@@ -232,6 +232,45 @@ exports.availabilityDeadlineReport = functions.pubsub
   });
 
 /**
+ * Function 3 — onReviewCreated:
+ * Triggered when a student submits a new review.
+ */
+exports.onReviewCreated = functions.firestore
+  .document("reviews/{reviewId}")
+  .onCreate(async (snap, context) => {
+    const review = snap.data();
+    const driverId = review && review.driverId;
+
+    if (!driverId) return null;
+
+    const driverRef = admin
+      .firestore()
+      .collection(COLLECTIONS.USERS)
+      .doc(driverId);
+
+    await admin.firestore().runTransaction(async (transaction) => {
+      const driverSnap = await transaction.get(driverRef);
+      if (!driverSnap.exists) return;
+
+      const driverData = driverSnap.data() || {};
+      const currentRating = Number(driverData.rating) || 0;
+      const totalRides = Number(driverData.totalRides) || 0;
+      const reviewRating = Number(review.rating) || 0;
+
+      const updatedTotalRides = totalRides + 1;
+      const updatedRating =
+        (currentRating * totalRides + reviewRating) / updatedTotalRides;
+
+      transaction.update(driverRef, {
+        rating: Number(updatedRating.toFixed(1)),
+        totalRides: updatedTotalRides,
+      });
+    });
+
+    return null;
+  });
+
+/**
  * Function 3 — feeReminder:
  * Scheduled for 1st of month at 9 AM PKT.
  */

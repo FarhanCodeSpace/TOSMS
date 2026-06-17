@@ -179,15 +179,29 @@ const DriverHomeScreen: React.FC<DriverHomeScreenProps> = ({ navigation }) => {
                 ridesQuery,
                 (snapshot) => {
                   if (!auth.currentUser) return;
+                  const statusPriority: Record<string, number> = {
+                    scheduled: 3,
+                    active: 2,
+                    completed: 1,
+                  };
+
                   let found: (Ride & { rideId: string }) | null = null;
+                  let foundPriority = 0;
+
                   snapshot.forEach((d) => {
-                    const rData = d.data();
-                    if (rData.date === todayStr) {
-                      found = { rideId: d.id, ...rData } as Ride & {
-                        rideId: string;
-                      };
+                    const rData = d.data() as Ride & { date?: string };
+                    if (rData.date !== todayStr) return;
+
+                    const priority = statusPriority[rData.status] || 0;
+                    if (priority >= foundPriority) {
+                      foundPriority = priority;
+                      found = {
+                        rideId: d.id,
+                        ...rData,
+                      } as Ride & { rideId: string };
                     }
                   });
+
                   setTodayRide(found);
                   setRideLoading(false);
                 },

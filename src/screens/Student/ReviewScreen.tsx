@@ -14,11 +14,9 @@ import { COLLECTIONS } from "@config/firebaseCollections";
 import {
   doc,
   getDoc,
-  updateDoc,
   collection,
   addDoc,
   serverTimestamp,
-  runTransaction,
 } from "firebase/firestore";
 import { useAuth } from "@hooks/useAuth";
 import { COLORS, SPACING, FONTS } from "@constants/theme";
@@ -26,7 +24,7 @@ import { StackScreenProps } from "@react-navigation/stack";
 import { StudentHomeStackParamList } from "@navigation/types";
 import { CommonActions } from "@react-navigation/native";
 import { User } from "@types";
-import AvatarComponent from '@components/common/Avatar';
+import AvatarComponent from "@components/common/Avatar";
 
 type ReviewScreenProps = StackScreenProps<StudentHomeStackParamList, "Review">;
 
@@ -74,40 +72,17 @@ export const ReviewScreen: React.FC<ReviewScreenProps> = ({
 
     setIsSubmitting(true);
     try {
-      await runTransaction(db, async (transaction) => {
-        // 1. Prepare review document
-        const newReview = {
-          studentId: currentUser?.uid || "anonymous",
-          studentName: currentUser?.fullName || "Anonymous Student",
-          driverId,
-          rideId,
-          rating,
-          comment: comment || "",
-          createdAt: serverTimestamp(),
-        };
+      const newReview = {
+        studentId: currentUser?.uid || "anonymous",
+        studentName: currentUser?.fullName || "Anonymous Student",
+        driverId,
+        rideId,
+        rating,
+        comment: comment || "",
+        createdAt: serverTimestamp(),
+      };
 
-        // 2. Update driver's rating
-        const driverRef = doc(db, COLLECTIONS.USERS, String(driverId));
-        const driverSnap = await transaction.get(driverRef);
-
-        if (driverSnap.exists()) {
-          const driverData = driverSnap.data();
-          const currentRating = Number(driverData.rating) || 0;
-          const totalRides = Number(driverData.totalRides) || 0;
-
-          const newAvgRating =
-            (currentRating * totalRides + rating) / (totalRides + 1);
-
-          transaction.update(driverRef, {
-            rating: Number(newAvgRating.toFixed(1)),
-            totalRides: totalRides + 1,
-          });
-        }
-
-        // 3. Add the review using transaction.set with an auto-id
-        const newReviewRef = doc(collection(db, COLLECTIONS.REVIEWS));
-        transaction.set(newReviewRef, newReview);
-      });
+      await addDoc(collection(db, COLLECTIONS.REVIEWS), newReview);
 
       // Reset loading state before showing success popup
       setIsSubmitting(false);
@@ -208,7 +183,7 @@ export const ReviewScreen: React.FC<ReviewScreenProps> = ({
           buttonColor={COLORS.primary}
         >
           {isSubmitting ? (
-            <Text style={{ color: 'white', fontWeight: '700', fontSize: 16 }}>
+            <Text style={{ color: "white", fontWeight: "700", fontSize: 16 }}>
               Submitting...
             </Text>
           ) : (

@@ -1,15 +1,22 @@
-import React, { useRef, useEffect } from 'react';
-import { View, StyleSheet, Animated } from 'react-native';
-import { Text, Button, Card } from 'react-native-paper';
-import { COLORS, SPACING, FONTS } from '@constants/theme';
-import { StackScreenProps } from '@react-navigation/stack';
-import { StudentHomeStackParamList } from '@navigation/types';
-import { CommonActions } from '@react-navigation/native';
+import React, { useRef, useEffect } from "react";
+import { View, StyleSheet, Animated } from "react-native";
+import { Text, Button, Card } from "react-native-paper";
+import { COLORS, SPACING, FONTS } from "@constants/theme";
+import { StackScreenProps } from "@react-navigation/stack";
+import { StudentHomeStackParamList } from "@navigation/types";
+import { CommonActions } from "@react-navigation/native";
 
-type BookingConfirmScreenProps = StackScreenProps<StudentHomeStackParamList, 'BookingConfirm'>;
+type BookingConfirmScreenProps = StackScreenProps<
+  StudentHomeStackParamList,
+  "BookingConfirm"
+>;
 
-export const BookingConfirmScreen: React.FC<BookingConfirmScreenProps> = ({ route, navigation }) => {
-  const { bookingId, fareAmount, routeName, seatNumber, driverName, rideId } = route.params;
+export const BookingConfirmScreen: React.FC<BookingConfirmScreenProps> = ({
+  route,
+  navigation,
+}) => {
+  const { bookingId, fareAmount, routeName, seatNumber, driverName, rideId } =
+    route.params;
 
   const scaleAnim = useRef(new Animated.Value(0)).current;
 
@@ -23,12 +30,7 @@ export const BookingConfirmScreen: React.FC<BookingConfirmScreenProps> = ({ rout
   }, []);
 
   const handleTrackRide = () => {
-    navigation.navigate('Payment', {
-      bookingId,
-      fareAmount,
-      routeName,
-      seatNumber,
-      driverName,
+    navigation.navigate("TrackRide", {
       rideId,
     });
   };
@@ -37,20 +39,24 @@ export const BookingConfirmScreen: React.FC<BookingConfirmScreenProps> = ({ rout
     navigation.dispatch(
       CommonActions.reset({
         index: 0,
-        routes: [{ name: 'StudentHome' }],
-      })
+        routes: [{ name: "StudentHome" }],
+      }),
     );
   };
 
   return (
     <View style={styles.container}>
       {/* Animated Check Circle */}
-      <Animated.View style={[styles.checkCircle, { transform: [{ scale: scaleAnim }] }]}>
+      <Animated.View
+        style={[styles.checkCircle, { transform: [{ scale: scaleAnim }] }]}
+      >
         <Text style={styles.checkEmoji}>✅</Text>
       </Animated.View>
 
       <Text style={styles.title}>Booking Confirmed!</Text>
-      <Text style={styles.subtitle}>Your seat has been reserved successfully.</Text>
+      <Text style={styles.subtitle}>
+        Your seat has been reserved successfully.
+      </Text>
 
       {/* Booking Details Card */}
       <Card style={styles.detailsCard}>
@@ -72,7 +78,9 @@ export const BookingConfirmScreen: React.FC<BookingConfirmScreenProps> = ({ rout
           <View style={styles.divider} />
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Fare</Text>
-            <Text style={[styles.detailValue, { color: COLORS.accent }]}>PKR {fareAmount?.toLocaleString()}</Text>
+            <Text style={[styles.detailValue, { color: COLORS.accent }]}>
+              PKR {fareAmount?.toLocaleString()}
+            </Text>
           </View>
         </Card.Content>
       </Card>
@@ -104,51 +112,51 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     padding: SPACING.lg,
   },
   checkCircle: {
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: '#E8F5E9',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#E8F5E9",
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: SPACING.lg,
     elevation: 4,
   },
   checkEmoji: { fontSize: 60 },
   title: {
     fontSize: FONTS.xxl + 4,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: COLORS.primary,
     marginBottom: SPACING.sm,
-    textAlign: 'center',
+    textAlign: "center",
   },
   subtitle: {
     fontSize: FONTS.md,
     color: COLORS.textSecondary,
     marginBottom: SPACING.xl,
-    textAlign: 'center',
+    textAlign: "center",
   },
   detailsCard: {
-    width: '100%',
+    width: "100%",
     backgroundColor: COLORS.surface,
     elevation: 3,
     borderRadius: 12,
     marginBottom: SPACING.xl,
   },
   detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingVertical: SPACING.sm,
   },
   detailLabel: { fontSize: FONTS.md, color: COLORS.textSecondary },
-  detailValue: { fontSize: FONTS.md, fontWeight: 'bold', color: COLORS.text },
-  divider: { height: 1, backgroundColor: '#F0F0F0' },
-  buttonsRow: { flexDirection: 'row', gap: SPACING.md, width: '100%' },
+  detailValue: { fontSize: FONTS.md, fontWeight: "bold", color: COLORS.text },
+  divider: { height: 1, backgroundColor: "#F0F0F0" },
+  buttonsRow: { flexDirection: "row", gap: SPACING.md, width: "100%" },
   btn: { flex: 1, borderRadius: 8 },
 });
 

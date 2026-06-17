@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   StyleSheet,
@@ -29,6 +29,9 @@ import { COLLECTIONS } from "@config/firebaseCollections";
 import {
   collection,
   addDoc,
+  getDocs,
+  query,
+  where,
   serverTimestamp,
   Timestamp,
 } from "firebase/firestore";
@@ -36,6 +39,7 @@ import { useAuth } from "@hooks/useAuth";
 import { COLORS, SPACING } from "@constants/theme";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { DriverHomeStackParamList } from "@navigation/types";
+import { getPakistanTodayString } from "@utils/dateHelpers";
 
 type CreateRideScreenProps = {
   navigation: StackNavigationProp<DriverHomeStackParamList, "CreateRide">;
@@ -45,6 +49,42 @@ const CreateRideScreen: React.FC<CreateRideScreenProps> = ({ navigation }) => {
   const { currentUser } = useAuth();
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
+  const [assignedRouteId, setAssignedRouteId] = useState(
+    currentUser?.routeId || "",
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadAssignedRoute = async () => {
+      if (currentUser?.routeId) {
+        setAssignedRouteId(currentUser.routeId);
+        return;
+      }
+
+      if (!currentUser?.uid) return;
+
+      try {
+        const routeQuery = query(
+          collection(db, COLLECTIONS.ROUTES),
+          where("assignedDriverId", "==", currentUser.uid),
+        );
+        const routeSnap = await getDocs(routeQuery);
+
+        if (isMounted && !routeSnap.empty) {
+          setAssignedRouteId(routeSnap.docs[0].id);
+        }
+      } catch (error) {
+        console.error("Error loading assigned route:", error);
+      }
+    };
+
+    loadAssignedRoute();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser?.uid, currentUser?.routeId]);
 
   // Step 1: Route Info
   const [routeName, setRouteName] = useState("");
@@ -149,6 +189,16 @@ const CreateRideScreen: React.FC<CreateRideScreenProps> = ({ navigation }) => {
 
     setIsLoading(true);
     try {
+      const routeId = assignedRouteId || currentUser?.routeId || "";
+
+      if (!routeId) {
+        Alert.alert(
+          "No Route Assigned",
+          "Please assign a route to your driver profile before posting a ride.",
+        );
+        return;
+      }
+
       const combinedDeparture = new Date(departureDate);
       combinedDeparture.setHours(
         departureTime.getHours(),
@@ -168,6 +218,7 @@ const CreateRideScreen: React.FC<CreateRideScreenProps> = ({ navigation }) => {
       }
 
       const rideData = {
+        routeId,
         driverId: currentUser?.uid,
         driverName: currentUser?.fullName,
         driverPhone: currentUser?.phone,
@@ -179,6 +230,9 @@ const CreateRideScreen: React.FC<CreateRideScreenProps> = ({ navigation }) => {
         endLocation: endLoc,
         stops,
         departureTime: Timestamp.fromDate(combinedDeparture),
+        date: new Date(combinedDeparture.getTime() + 5 * 60 * 60 * 1000)
+          .toISOString()
+          .split("T")[0],
         totalSeats: total,
         availableSeats: total,
         farePerSeat: parseInt(farePerSeat),
